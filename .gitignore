@@ -1,0 +1,63 @@
+# Prerequisites
+*.d
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio 2019+
+.vs/
+*.sln.optdata
+*.suo
+*.user
+*.userosscache
+*.opendata
+*.upgradelog
+*.log
+*.vc14.upgrade
+*.rcproj.vspscc
+*.vssscc
+*.bak
+*.aps
+*.bsc
+*.ccf
+*.cdf
+*.hpj
+*.lck
+*.msi
+*.sbr
+*.rsp
+*.pch
+*.pgc
+*.pgd
+*.meta
+*.tlb
+*.tlh
+*.tli
+*.tmp
+*.vspscc
+*.vsscc
+*.vssscc
+*.vsxlog
+*.vsxpscc
+*.vsw
+*.code-workspace
+
+# Visual Studio Code
+.vscode/
+
+# NuGet
+.nuget/
+*.nupkg
+*.snupkg
+*.lock.json
+
+# Resharper
+*.resharper
+*.dotSettings

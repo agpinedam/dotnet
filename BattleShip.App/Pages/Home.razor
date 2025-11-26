@@ -1,0 +1,146 @@
+﻿@page "/"
+@using BattleShip.App.Services
+@inject GameClient GameClient
+
+<PageTitle>BattleShip</PageTitle>
+
+<h1>BattleShip</h1>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="StartGame">Start New Game</button>
+    <span class="ms-3 fw-bold">@GameClient.Message</span>
+</div>
+
+@if (GameClient.CurrentGame != null)
+{
+    <div class="container">
+        <div class="row">
+            <!-- Player Grid -->
+            <div class="col-md-6">
+                <h3>Your Grid</h3>
+                <div class="battleship-grid">
+                    @for (int r = 0; r < 10; r++)
+                    {
+                        <div class="grid-row">
+                            @for (int c = 0; c < 10; c++)
+                            {
+                                var cell = GameClient.CurrentGame.PlayerGrid[r][c];
+                                <div class="grid-cell @GetPlayerCellClass(cell)">
+                                    @if (cell != '\0')
+                                    {
+                                        @cell
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Opponent Grid -->
+            <div class="col-md-6">
+                <h3>Opponent Grid</h3>
+                <div class="battleship-grid">
+                    @for (int r = 0; r < 10; r++)
+                    {
+                        <div class="grid-row">
+                            @for (int c = 0; c < 10; c++)
+                            {
+                                int row = r;
+                                int col = c;
+                                var cell = GameClient.CurrentGame.OpponentGrid[r][c];
+                                <div class="grid-cell @GetOpponentCellClass(cell) clickable" 
+                                     @onclick="() => Attack(row, col)">
+                                    @if (cell == true)
+                                    {
+                                        <span>X</span>
+                                    }
+                                    else if (cell == false)
+                                    {
+                                        <span>O</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .battleship-grid {
+        display: flex;
+        flex-direction: column;
+        border: 2px solid #333;
+        width: fit-content;
+    }
+
+    .grid-row {
+        display: flex;
+    }
+
+    .grid-cell {
+        width: 30px;
+        height: 30px;
+        border: 1px solid #ccc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+
+    .clickable:hover {
+        cursor: pointer;
+        background-color: #f0f0f0;
+    }
+
+    /* Player Cell Styles */
+    .cell-ship { background-color: #bbb; }
+    .cell-hit { background-color: #ffcccc; color: red; }
+    .cell-miss { background-color: #ccf2ff; color: blue; }
+
+    /* Opponent Cell Styles */
+    .opp-hit { background-color: #ff4444; color: white; }
+    .opp-miss { background-color: #88ccff; color: white; }
+</style>
+
+@code {
+    private async Task StartGame()
+    {
+        await GameClient.StartGameAsync();
+    }
+
+    private async Task Attack(int row, int col)
+    {
+        if (GameClient.CurrentGame?.IsGameOver == true) return;
+        
+        // Prevent attacking already hit cells locally to save a call (optional)
+        if (GameClient.CurrentGame?.OpponentGrid[row][col] != null) return;
+
+        await GameClient.AttackAsync(row, col);
+    }
+
+    private string GetPlayerCellClass(char cell)
+    {
+        return cell switch
+        {
+            'X' => "cell-hit",
+            'O' => "cell-miss",
+            'M' => "cell-miss", // Handling both 'O' and 'M' just in case
+            '\0' => "",
+            _ => "cell-ship" // Any other char is a ship
+        };
+    }
+
+    private string GetOpponentCellClass(bool? cell)
+    {
+        return cell switch
+        {
+            true => "opp-hit",
+            false => "opp-miss",
+            null => ""
+        };
+    }
+}

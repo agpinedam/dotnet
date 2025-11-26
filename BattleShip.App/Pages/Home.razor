@@ -7,7 +7,8 @@
 <h1>BattleShip</h1>
 
 <div class="mb-3">
-    <button class="btn btn-primary" @onclick="StartGame">Start New Game</button>
+    <button class="btn btn-primary" @onclick="() => StartGame(false)">Start New Game (REST)</button>
+    <button class="btn btn-secondary ms-2" @onclick="() => StartGame(true)">Start New Game (gRPC)</button>
     <span class="ms-3 fw-bold">@GameClient.Message</span>
 </div>
 
@@ -111,9 +112,9 @@
 </style>
 
 @code {
-    private async Task StartGame()
+    private async Task StartGame(bool useGrpc)
     {
-        await GameClient.StartGameAsync();
+        await GameClient.StartGameAsync(useGrpc);
     }
 
     private async Task Attack(int row, int col)

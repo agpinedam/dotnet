@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option csharp_namespace = "BattleShip.Protos";
+
+package battleship;
+
+service Game {
+  rpc CreateGame (Empty) returns (GrpcGameStatus);
+  rpc Attack (GrpcAttackRequest) returns (GrpcGameStatus);
+}
+
+message Empty {}
+
+message GrpcAttackRequest {
+    string gameId = 1;
+    int32 row = 2;
+    int32 col = 3;
+}
+
+message GrpcGameStatus {
+  string gameId = 1;
+  repeated string playerGrid = 2; // Each string represents a row, e.g. "ABC..."
+  repeated OpponentRow opponentGrid = 3;
+  string winner = 4;
+  bool isGameOver = 5;
+  string lastAttackResult = 6;
+  string lastAiAttackResult = 7;
+}
+
+message OpponentRow {
+    repeated int32 values = 1; // 0 = null, 1 = hit (true), 2 = miss (false)
+}

@@ -5,6 +5,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddSingleton<IGameService, GameService>();
+builder.Services.AddGrpc(); // Add gRPC services
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -14,15 +15,20 @@ builder.Services.AddCors(options =>
         {
             policy.AllowAnyOrigin()
                    .AllowAnyMethod()
-                   .AllowAnyHeader();
+                   .AllowAnyHeader()
+                   .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding"); // Required for gRPC-Web
         });
 });
 
 var app = builder.Build();
 
 app.UseCors("AllowAll");
+app.UseGrpcWeb(); // Enable gRPC-Web
 
 app.MapGet("/", () => "BattleShip API is running!");
+
+// Map gRPC Service
+app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
 
 app.MapPost("/game", (IGameService gameService) =>
 {

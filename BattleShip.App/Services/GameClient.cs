@@ -51,7 +51,15 @@ public class GameClient
                 
                 if (CurrentGame?.IsGameOver == true)
                 {
-                    Message = $"Game Over! Winner: {CurrentGame.Winner}";
+                    if ( CurrentGame.Winner=="Player")
+                    {
+                        Message = "Vous avez gagné!";
+                    }
+                    else
+                    {
+                        Message = "Vous avez perdu!";
+                    }
+                    
                 }
                 else
                 {

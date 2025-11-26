@@ -25,11 +25,20 @@
                             @for (int c = 0; c < 10; c++)
                             {
                                 var cell = GameClient.CurrentGame.PlayerGrid[r][c];
-                                <div class="grid-cell @GetPlayerCellClass(cell)">
-                                    @if (cell != '\0')
+                                <div class="grid-cell">
+                                    @if (cell == 'X')
+                                    {
+                                        <img src="/images/hit.png" alt="Hit" />
+                                    }
+                                    else if (cell == 'O') 
+                                    {
+                                        <img src="/images/miss.png" alt="Miss" />
+                                    }
+                                    else if (cell != '\0')
                                     {
                                         @cell
                                     }
+                                
                                 </div>
                             }
                         </div>
@@ -49,15 +58,15 @@
                                 int row = r;
                                 int col = c;
                                 var cell = GameClient.CurrentGame.OpponentGrid[r][c];
-                                <div class="grid-cell @GetOpponentCellClass(cell) clickable" 
+                                <div class="grid-cell @(cell == null ? "clickable" : "")" 
                                      @onclick="() => Attack(row, col)">
                                     @if (cell == true)
                                     {
-                                        <span>X</span>
+                                        <img src="/images/hit.png" alt="Hit" />
                                     }
                                     else if (cell == false)
                                     {
-                                        <span>O</span>
+                                        <img src="/images/miss.png" alt="Miss" />
                                     }
                                 </div>
                             }
@@ -82,28 +91,23 @@
     }
 
     .grid-cell {
-        width: 30px;
-        height: 30px;
+        width: 35px;
+        height: 35px;
         border: 1px solid #ccc;
         display: flex;
         align-items: center;
         justify-content: center;
         font-weight: bold;
+        font-size: 1.2em;
+        background-color: #f0f8ff; /* AliceBlue for water */
+    }
+    
+    .grid-cell img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
     }
 
-    .clickable:hover {
-        cursor: pointer;
-        background-color: #f0f0f0;
-    }
-
-    /* Player Cell Styles */
-    .cell-ship { background-color: #bbb; }
-    .cell-hit { background-color: #ffcccc; color: red; }
-    .cell-miss { background-color: #ccf2ff; color: blue; }
-
-    /* Opponent Cell Styles */
-    .opp-hit { background-color: #ff4444; color: white; }
-    .opp-miss { background-color: #88ccff; color: white; }
 </style>
 
 @code {
@@ -116,31 +120,9 @@
     {
         if (GameClient.CurrentGame?.IsGameOver == true) return;
         
-        // Prevent attacking already hit cells locally to save a call (optional)
+        // Prevent attacking already targeted cells
         if (GameClient.CurrentGame?.OpponentGrid[row][col] != null) return;
 
         await GameClient.AttackAsync(row, col);
-    }
-
-    private string GetPlayerCellClass(char cell)
-    {
-        return cell switch
-        {
-            'X' => "cell-hit",
-            'O' => "cell-miss",
-            'M' => "cell-miss", // Handling both 'O' and 'M' just in case
-            '\0' => "",
-            _ => "cell-ship" // Any other char is a ship
-        };
-    }
-
-    private string GetOpponentCellClass(bool? cell)
-    {
-        return cell switch
-        {
-            true => "opp-hit",
-            false => "opp-miss",
-            null => ""
-        };
     }
 }

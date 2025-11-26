@@ -16,4 +16,9 @@
     <ProjectReference Include="..\BattleShip.Models\BattleShip.Models.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="wwwroot\images\hit.png" />
+    <None Include="wwwroot\images\miss.png" />
+  </ItemGroup>
+
 </Project>

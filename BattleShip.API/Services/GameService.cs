@@ -162,23 +162,7 @@ public class GameService : IGameService
         if (game.PreviousStates.Count > 0)
         {
             var previousState = game.PreviousStates.Pop();
-            // Restore the previous state, but keep the stack of previous states (which belongs to the game object wrapper in a real memento, but here we are replacing the object content or the object itself)
-            // Since _games holds a reference to 'game', and 'previousState' is a different object, we need to update the dictionary or copy properties back.
-            // Updating the dictionary is cleaner.
             
-            // IMPORTANT: The popped state has an empty PreviousStates stack because of DeepCopy implementation.
-            // We need to preserve the history of states that came BEFORE the one we just popped.
-            // Wait, my DeepCopy implementation:
-            // copy.PreviousStates is NOT copied. It's new.
-            
-            // So 'previousState' has an empty stack.
-            // But 'game' (current state) has the stack.
-            // If we just swap them, we lose the rest of the history.
-            
-            // Correct logic:
-            // 1. Get the stack from the current 'game'.
-            // 2. We already popped the top (which is 'previousState').
-            // 3. Assign this stack to 'previousState'.
             previousState.PreviousStates = game.PreviousStates;
             
             // 4. Update the dictionary
@@ -369,10 +353,6 @@ public class GameService : IGameService
                 LastAiAttackResult = this.LastAiAttackResult,
                 History = new List<MoveHistory>(this.History),
                 AiMoves = new Queue<(int, int)>(this.AiMoves),
-                // We don't copy PreviousStates here because the snapshot itself IS a previous state.
-                // The snapshot doesn't need to carry the burden of the entire history stack recursively.
-                // However, if we undo, we pop from the current game's stack.
-                // So the object in the stack is just a snapshot of data.
             };
 
             // Deep copy arrays

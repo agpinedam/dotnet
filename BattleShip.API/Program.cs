@@ -1,10 +1,17 @@
 using BattleShip.API.Services;
+using BattleShip.API.Validators;
 using BattleShip.Models;
+using BattleShip.Protos;
+using FluentValidation;
+using Microsoft.AspNetCore.Http.HttpResults;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddSingleton<IGameService, GameService>();
+builder.Services.AddScoped<IValidator<AttackRequest>, AttackRequestValidator>();
+builder.Services.AddScoped<IValidator<GrpcAttackRequest>, GrpcAttackRequestValidator>();
+builder.Services.AddScoped<IValidator<GrpcUndoRequest>, GrpcUndoRequestValidator>();
 builder.Services.AddGrpc(); // Add gRPC services
 
 // Add CORS
@@ -30,35 +37,41 @@ app.MapGet("/", () => "BattleShip API is running!");
 // Map gRPC Service
 app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
 
-app.MapPost("/game", (IGameService gameService) =>
+app.MapPost("/game", Ok<GameStatus> (IGameService gameService) =>
 {
     var game = gameService.CreateGame();
-    return Results.Ok(game);
+    return TypedResults.Ok(game);
 });
 
-app.MapPost("/game/{id}/attack", (Guid id, AttackRequest request, IGameService gameService) =>
+app.MapPost("/game/{id}/attack", async Task<Results<Ok<GameStatus>, NotFound<string>, ValidationProblem>> (Guid id, AttackRequest request, IGameService gameService, IValidator<AttackRequest> validator) =>
 {
+    var validationResult = await validator.ValidateAsync(request);
+    if (!validationResult.IsValid)
+    {
+        return TypedResults.ValidationProblem(validationResult.ToDictionary());
+    }
+
     try
     {
         var game = gameService.Attack(id, request.Row, request.Col);
-        return Results.Ok(game);
+        return TypedResults.Ok(game);
     }
     catch (ArgumentException)
     {
-        return Results.NotFound("Game not found");
+        return TypedResults.NotFound("Game not found");
     }
 });
 
-app.MapPost("/game/{id}/undo", (Guid id, IGameService gameService) =>
+app.MapPost("/game/{id}/undo", Results<Ok<GameStatus>, NotFound<string>> (Guid id, IGameService gameService) =>
 {
     try
     {
         var game = gameService.Undo(id);
-        return Results.Ok(game);
+        return TypedResults.Ok(game);
     }
     catch (ArgumentException)
     {
-        return Results.NotFound("Game not found");
+        return TypedResults.NotFound("Game not found");
     }
 });
 

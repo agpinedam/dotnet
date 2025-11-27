@@ -1,4 +1,5 @@
 using BattleShip.Protos;
+using FluentValidation;
 using Grpc.Core;
 
 namespace BattleShip.API.Services;
@@ -6,10 +7,14 @@ namespace BattleShip.API.Services;
 public class GrpcGameService : Game.GameBase
 {
     private readonly IGameService _gameService;
+    private readonly IValidator<GrpcAttackRequest> _attackValidator;
+    private readonly IValidator<GrpcUndoRequest> _undoValidator;
 
-    public GrpcGameService(IGameService gameService)
+    public GrpcGameService(IGameService gameService, IValidator<GrpcAttackRequest> attackValidator, IValidator<GrpcUndoRequest> undoValidator)
     {
         _gameService = gameService;
+        _attackValidator = attackValidator;
+        _undoValidator = undoValidator;
     }
 
     public override Task<GrpcGameStatus> CreateGame(Empty request, ServerCallContext context)
@@ -18,13 +23,19 @@ public class GrpcGameService : Game.GameBase
         return Task.FromResult(MapToGrpc(game));
     }
 
-    public override Task<GrpcGameStatus> Attack(GrpcAttackRequest request, ServerCallContext context)
+    public override async Task<GrpcGameStatus> Attack(GrpcAttackRequest request, ServerCallContext context)
     {
+        var validationResult = await _attackValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+             throw new RpcException(new Status(StatusCode.InvalidArgument, validationResult.ToString()));
+        }
+
         try
         {
             var gameId = Guid.Parse(request.GameId);
             var game = _gameService.Attack(gameId, request.Row, request.Col);
-            return Task.FromResult(MapToGrpc(game));
+            return MapToGrpc(game);
         }
         catch (ArgumentException)
         {
@@ -32,13 +43,19 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
-    public override Task<GrpcGameStatus> Undo(GrpcUndoRequest request, ServerCallContext context)
+    public override async Task<GrpcGameStatus> Undo(GrpcUndoRequest request, ServerCallContext context)
     {
+        var validationResult = await _undoValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+             throw new RpcException(new Status(StatusCode.InvalidArgument, validationResult.ToString()));
+        }
+
         try
         {
             var gameId = Guid.Parse(request.GameId);
             var game = _gameService.Undo(gameId);
-            return Task.FromResult(MapToGrpc(game));
+            return MapToGrpc(game);
         }
         catch (ArgumentException)
         {

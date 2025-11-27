@@ -82,7 +82,7 @@
         </div>
 
         <!-- History Section -->
-        @if (GameClient.CurrentGame.History != null && GameClient.CurrentGame.History.Any())
+        @if (GameClient.CurrentGame.History.Any())
         {
             <div class="row mt-4">
                 <div class="col-12">
@@ -99,17 +99,18 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach (var move in ((IEnumerable<BattleShip.Models.MoveHistory>)GameClient.CurrentGame.History).Reverse())
-                                {
-                                    <tr>
-                                        <td>@move.Turn</td>
-                                        <td>@move.PlayerMove</td>
-                                        <td>@move.PlayerResult</td>
-                                        <td>@move.AiMove</td>
-                                        <td>@move.AiResult</td>
-                                    </tr>
-                                }
+                            @foreach (var move in ((IEnumerable<Models.MoveHistory>)GameClient.CurrentGame.History).Reverse())
+                            {
+                                <tr @onclick="() => UndoToTurn(move.Turn)" style="cursor:pointer;">
+                                    <td>@move.Turn</td>
+                                    <td>@move.PlayerMove</td>
+                                    <td>@move.PlayerResult</td>
+                                    <td>@move.AiMove</td>
+                                    <td>@move.AiResult</td>
+                                </tr>
+                            }
                             </tbody>
+
                         </table>
                     </div>
                 </div>
@@ -170,4 +171,13 @@
     {
         await GameClient.UndoAsync();
     }
+    
+    private async Task UndoToTurn(int turn)
+    {
+        while (GameClient.CurrentGame != null && GameClient.CurrentGame.History.Last().Turn > turn)
+        {
+            await GameClient.UndoAsync();
+        }
+    }
+
 }

@@ -6,4 +6,5 @@ public interface IGameService
 {
     GameStatus CreateGame();
     GameStatus Attack(Guid gameId, int row, int col);
+    GameStatus Undo(Guid gameId);
 }

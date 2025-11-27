@@ -49,5 +49,18 @@ app.MapPost("/game/{id}/attack", (Guid id, AttackRequest request, IGameService g
     }
 });
 
+app.MapPost("/game/{id}/undo", (Guid id, IGameService gameService) =>
+{
+    try
+    {
+        var game = gameService.Undo(id);
+        return Results.Ok(game);
+    }
+    catch (ArgumentException)
+    {
+        return Results.NotFound("Game not found");
+    }
+});
+
 app.Run();
 

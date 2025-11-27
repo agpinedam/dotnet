@@ -32,6 +32,20 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
+    public override Task<GrpcGameStatus> Undo(GrpcUndoRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var gameId = Guid.Parse(request.GameId);
+            var game = _gameService.Undo(gameId);
+            return Task.FromResult(MapToGrpc(game));
+        }
+        catch (ArgumentException)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Game not found"));
+        }
+    }
+
     private GrpcGameStatus MapToGrpc(BattleShip.Models.GameStatus game)
     {
         var grpcGame = new GrpcGameStatus
@@ -65,6 +79,22 @@ public class GrpcGameService : Game.GameBase
                 grpcRow.Values.Add(val);
             }
             grpcGame.OpponentGrid.Add(grpcRow);
+        }
+
+        // Map History
+        if (game.History != null)
+        {
+            foreach (var h in game.History)
+            {
+                grpcGame.History.Add(new GrpcMoveHistory
+                {
+                    Turn = h.Turn,
+                    PlayerMove = h.PlayerMove ?? "",
+                    PlayerResult = h.PlayerResult ?? "",
+                    AiMove = h.AiMove ?? "",
+                    AiResult = h.AiResult ?? ""
+                });
+            }
         }
 
         return grpcGame;

@@ -58,7 +58,8 @@ public class GameClient
             GameId = Guid.Parse(grpcGame.GameId),
             Winner = string.IsNullOrEmpty(grpcGame.Winner) ? null : grpcGame.Winner,
             LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
-            LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult
+            LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
+            History = new List<MoveHistory>()
             // IsGameOver is calculated property in model, but we can set it if we had a setter or just rely on Winner.
             // But wait, IsGameOver is getter only based on Winner. So setting Winner is enough.
         };
@@ -86,6 +87,19 @@ public class GameClient
             }
         }
 
+        // Map History
+        foreach (var h in grpcGame.History)
+        {
+            game.History.Add(new MoveHistory
+            {
+                Turn = h.Turn,
+                PlayerMove = h.PlayerMove,
+                PlayerResult = h.PlayerResult,
+                AiMove = h.AiMove,
+                AiResult = h.AiResult
+            });
+        }
+
         return game;
     }
 
@@ -109,8 +123,7 @@ public class GameClient
             else
             {
                 var request = new AttackRequest { Row = row, Col = col };
-                var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/attack", request);Hit
-
+                var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/attack", request);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -139,6 +152,39 @@ public class GameClient
             {
                 Message = $"{CurrentGame?.LastAttackResult} | {CurrentGame?.LastAiAttackResult}";
             }
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error: {ex.Message}";
+        }
+    }
+
+    public async Task UndoAsync()
+    {
+        if (CurrentGame == null) return;
+
+        try
+        {
+            if (_useGrpc)
+            {
+                var request = new GrpcUndoRequest { GameId = CurrentGame.GameId.ToString() };
+                var grpcGame = await _grpcClient.UndoAsync(request);
+                CurrentGame = MapFromGrpc(grpcGame);
+            }
+            else
+            {
+                var response = await _httpClient.PostAsync($"/game/{CurrentGame.GameId}/undo", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
+                }
+                else
+                {
+                    Message = "Undo failed.";
+                    return;
+                }
+            }
+            Message = "Undo successful.";
         }
         catch (Exception ex)
         {

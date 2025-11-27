@@ -45,4 +45,9 @@ public class GameStatus
     /// Result of the last attack by the AI (e.g., "AI attacked B5: Miss").
     /// </summary>
     public string? LastAiAttackResult { get; set; }
+
+    /// <summary>
+    /// History of moves played in the game.
+    /// </summary>
+    public List<MoveHistory> History { get; set; } = new();
 }

@@ -65,6 +65,15 @@ public class GameService : IGameService
             return GetGameStatus(game);
         }
 
+        // Save state for Undo
+        game.PreviousStates.Push(game.DeepCopy());
+
+        var currentTurn = new MoveHistory
+        {
+            Turn = game.History.Count + 1,
+            PlayerMove = GetCoordinateString(row, col)
+        };
+
         // Player Attack
         string attackResult = "Miss";
         if (row >= 0 && row < 10 && col >= 0 && col < 10)
@@ -94,11 +103,13 @@ public class GameService : IGameService
         }
 
         game.LastAttackResult = attackResult;
+        currentTurn.PlayerResult = attackResult;
 
         // Check Player Win
         if (CheckWin(game.AiGrid))
         {
             game.Winner = "Player";
+            game.History.Add(currentTurn);
             return GetGameStatus(game);
         }
 
@@ -106,13 +117,16 @@ public class GameService : IGameService
         if (game.AiMoves.Count > 0)
         {
             var (aiRow, aiCol) = game.AiMoves.Dequeue();
+            currentTurn.AiMove = GetCoordinateString(aiRow, aiCol);
+            
             char target = game.PlayerGrid[aiRow][aiCol];
             string aiResult;
             
             if (target != '\0' && target != 'X' && target != 'O')
             {
                 game.PlayerGrid[aiRow][aiCol] = 'X'; // Hit
-                aiResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Hit!";
+                aiResult = "Hit!";
+                game.LastAiAttackResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Hit!";
             }
             else
             {
@@ -121,15 +135,56 @@ public class GameService : IGameService
                 {
                     game.PlayerGrid[aiRow][aiCol] = 'O'; // Miss
                 }
-                aiResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Miss";
+                aiResult = "Miss";
+                game.LastAiAttackResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Miss";
             }
-            game.LastAiAttackResult = aiResult;
+            currentTurn.AiResult = aiResult;
 
             // Check AI Win
             if (CheckWin(game.PlayerGrid))
             {
                 game.Winner = "AI";
             }
+        }
+        
+        game.History.Add(currentTurn);
+
+        return GetGameStatus(game);
+    }
+
+    public GameStatus Undo(Guid gameId)
+    {
+        if (!_games.TryGetValue(gameId, out var game))
+        {
+            throw new ArgumentException("Game not found");
+        }
+
+        if (game.PreviousStates.Count > 0)
+        {
+            var previousState = game.PreviousStates.Pop();
+            // Restore the previous state, but keep the stack of previous states (which belongs to the game object wrapper in a real memento, but here we are replacing the object content or the object itself)
+            // Since _games holds a reference to 'game', and 'previousState' is a different object, we need to update the dictionary or copy properties back.
+            // Updating the dictionary is cleaner.
+            
+            // IMPORTANT: The popped state has an empty PreviousStates stack because of DeepCopy implementation.
+            // We need to preserve the history of states that came BEFORE the one we just popped.
+            // Wait, my DeepCopy implementation:
+            // copy.PreviousStates is NOT copied. It's new.
+            
+            // So 'previousState' has an empty stack.
+            // But 'game' (current state) has the stack.
+            // If we just swap them, we lose the rest of the history.
+            
+            // Correct logic:
+            // 1. Get the stack from the current 'game'.
+            // 2. We already popped the top (which is 'previousState').
+            // 3. Assign this stack to 'previousState'.
+            previousState.PreviousStates = game.PreviousStates;
+            
+            // 4. Update the dictionary
+            _games[gameId] = previousState;
+            
+            return GetGameStatus(previousState);
         }
 
         return GetGameStatus(game);
@@ -162,7 +217,8 @@ public class GameService : IGameService
             OpponentGrid = game.OpponentGrid,
             Winner = game.Winner,
             LastAttackResult = game.LastAttackResult,
-            LastAiAttackResult = game.LastAiAttackResult
+            LastAiAttackResult = game.LastAiAttackResult,
+            History = game.History
         };
     }
 
@@ -299,5 +355,32 @@ public class GameService : IGameService
         public string? Winner { get; set; }
         public string? LastAttackResult { get; set; }
         public string? LastAiAttackResult { get; set; }
+        
+        public List<MoveHistory> History { get; set; } = new();
+        public Stack<InternalGame> PreviousStates { get; set; } = new();
+
+        public InternalGame DeepCopy()
+        {
+            var copy = new InternalGame
+            {
+                Id = this.Id,
+                Winner = this.Winner,
+                LastAttackResult = this.LastAttackResult,
+                LastAiAttackResult = this.LastAiAttackResult,
+                History = new List<MoveHistory>(this.History),
+                AiMoves = new Queue<(int, int)>(this.AiMoves),
+                // We don't copy PreviousStates here because the snapshot itself IS a previous state.
+                // The snapshot doesn't need to carry the burden of the entire history stack recursively.
+                // However, if we undo, we pop from the current game's stack.
+                // So the object in the stack is just a snapshot of data.
+            };
+
+            // Deep copy arrays
+            copy.PlayerGrid = this.PlayerGrid.Select(r => (char[])r.Clone()).ToArray();
+            copy.AiGrid = this.AiGrid.Select(r => (char[])r.Clone()).ToArray();
+            copy.OpponentGrid = this.OpponentGrid.Select(r => (bool?[])r.Clone()).ToArray();
+
+            return copy;
+        }
     }
 }

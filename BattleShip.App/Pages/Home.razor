@@ -9,6 +9,10 @@
 <div class="mb-3">
     <button class="btn btn-primary" @onclick="() => StartGame(false)">Start New Game (REST)</button>
     <button class="btn btn-secondary ms-2" @onclick="() => StartGame(true)">Start New Game (gRPC)</button>
+    @if (GameClient.CurrentGame != null && !GameClient.CurrentGame.IsGameOver)
+    {
+        <button class="btn btn-warning ms-2" @onclick="Undo">Undo Last Move</button>
+    }
     <span class="ms-3 fw-bold">@GameClient.Message</span>
 </div>
 
@@ -76,6 +80,41 @@
                 </div>
             </div>
         </div>
+
+        <!-- History Section -->
+        @if (GameClient.CurrentGame.History != null && GameClient.CurrentGame.History.Any())
+        {
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h3>Move History</h3>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-striped table-bordered">
+                            <thead class="table-dark" style="position: sticky; top: 0;">
+                                <tr>
+                                    <th>Turn</th>
+                                    <th>Player Move</th>
+                                    <th>Result</th>
+                                    <th>AI Move</th>
+                                    <th>AI Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var move in ((IEnumerable<BattleShip.Models.MoveHistory>)GameClient.CurrentGame.History).Reverse())
+                                {
+                                    <tr>
+                                        <td>@move.Turn</td>
+                                        <td>@move.PlayerMove</td>
+                                        <td>@move.PlayerResult</td>
+                                        <td>@move.AiMove</td>
+                                        <td>@move.AiResult</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -125,5 +164,10 @@
         if (GameClient.CurrentGame?.OpponentGrid[row][col] != null) return;
 
         await GameClient.AttackAsync(row, col);
+    }
+
+    private async Task Undo()
+    {
+        await GameClient.UndoAsync();
     }
 }

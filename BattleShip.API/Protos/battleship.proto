@@ -7,6 +7,7 @@ package battleship;
 service Game {
   rpc CreateGame (Empty) returns (GrpcGameStatus);
   rpc Attack (GrpcAttackRequest) returns (GrpcGameStatus);
+  rpc Undo (GrpcUndoRequest) returns (GrpcGameStatus);
 }
 
 message Empty {}
@@ -17,6 +18,18 @@ message GrpcAttackRequest {
     int32 col = 3;
 }
 
+message GrpcUndoRequest {
+    string gameId = 1;
+}
+
+message GrpcMoveHistory {
+    int32 turn = 1;
+    string playerMove = 2;
+    string playerResult = 3;
+    string aiMove = 4;
+    string aiResult = 5;
+}
+
 message GrpcGameStatus {
   string gameId = 1;
   repeated string playerGrid = 2; // Each string represents a row, e.g. "ABC..."
@@ -25,6 +38,7 @@ message GrpcGameStatus {
   bool isGameOver = 5;
   string lastAttackResult = 6;
   string lastAiAttackResult = 7;
+  repeated GrpcMoveHistory history = 8;
 }
 
 message OpponentRow {

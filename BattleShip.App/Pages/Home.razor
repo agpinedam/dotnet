@@ -31,14 +31,51 @@
             <!-- Player Grid -->
             <div class="col-md-6">
                 <h3>Your Grid</h3>
-                <div class="battleship-grid">
+                <div class="battleship-grid" style="position: relative;">
+                    <!-- Render Ships -->
+                    @foreach (var ship in GameClient.CurrentGame.Ships)
+                    {
+                        var shipImage = ship.Size switch
+                        {
+                            4 => "ship4.png",
+                            3 => "ship3.png", 
+                            2 => "ship2.png",
+                            1 => "ship1.png",
+                            _ => "ship1.png"
+                        };
+
+                        const int CellSize = 35; 
+                        
+                        // Positioning
+                        var top = ship.Row * CellSize; 
+                        var left = ship.Col * CellSize;
+                        
+                        // Fill ship size
+                        var height = ship.Size * CellSize; 
+                        
+                        // Rotation logic
+                        var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
+
+                        <img src="/images/@shipImage" 
+                            style="position: absolute; 
+                                    top: @(top)px; 
+                                    left: @(left)px; 
+                                    width: @(CellSize)px; 
+                                    height: @(height)px; 
+                                    z-index: 1;
+                                    pointer-events: none;
+                                    /* El punto de pivote debe ser exactamente el centro de la PRIMERA celda */
+                                    transform-origin: 17.5px 17.5px;
+                                    transform: @rotation;" />
+                    }
+
                     @for (int r = 0; r < 10; r++)
                     {
                         <div class="grid-row">
                             @for (int c = 0; c < 10; c++)
                             {
                                 var cell = GameClient.CurrentGame.PlayerGrid[r][c];
-                                <div class="grid-cell">
+                                <div class="grid-cell" style="z-index: 2; background-color: transparent;">
                                     @if (cell == 'X')
                                     {
                                         <img src="/images/hit.png" alt="Hit" />
@@ -47,11 +84,6 @@
                                     {
                                         <img src="/images/miss.png" alt="Miss" />
                                     }
-                                    else if (cell != '\0')
-                                    {
-                                        @cell
-                                    }
-                                
                                 </div>
                             }
                         </div>
@@ -131,32 +163,43 @@
     .battleship-grid {
         display: flex;
         flex-direction: column;
-        border: 2px solid #333;
+        border: 2px solid #0a2fa8;
         width: fit-content;
+        position: relative; 
+        background-color: #78a7f5;
+        line-height: 0; 
     }
 
     .grid-row {
         display: flex;
+        padding: 0;
+        margin: 0;
     }
 
     .grid-cell {
         width: 35px;
         height: 35px;
-        border: 1px solid #ccc;
+        
+        box-sizing: border-box; 
+        border: 1px solid rgba(17, 27, 120, 0.3); 
+        
         display: flex;
         align-items: center;
         justify-content: center;
+        
         font-weight: bold;
         font-size: 1.2em;
-        background-color: #f0f8ff; /* AliceBlue for water */
+        padding: 0;
+        margin: 0;
+        background-color: #78a7f5;
     }
     
     .grid-cell img {
         width: 100%;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain; 
+        display: block;
     }
-
 </style>
 
 @code {

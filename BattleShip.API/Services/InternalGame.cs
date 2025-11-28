@@ -7,6 +7,7 @@ public class InternalGame
     public Guid Id { get; set; }
     public char[][] PlayerGrid { get; set; } = [];
     public char[][] AiGrid { get; set; } = [];
+    public List<ShipInfo> PlayerShips { get; set; } = new();
     public bool?[][] OpponentGrid { get; set; } = [];
     public Queue<(int, int)> AiMoves { get; set; } = new();
     public string? Winner { get; set; }
@@ -32,6 +33,7 @@ public class InternalGame
             LastAiAttackResult = this.LastAiAttackResult,
             Difficulty = this.Difficulty,
             History = new List<MoveHistory>(this.History),
+            PlayerShips = new List<ShipInfo>(this.PlayerShips), // Shallow copy of list is fine as ShipInfo is immutable-ish
             AiMoves = new Queue<(int, int)>(this.AiMoves),
             TargetStack = new Stack<(int, int)>(this.TargetStack.Reverse()), // Reverse to preserve order when pushing
             AlivePlayerShips = new List<int>(this.AlivePlayerShips),

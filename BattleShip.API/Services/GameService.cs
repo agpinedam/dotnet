@@ -18,10 +18,10 @@ public class GameService : IGameService
         var gameId = Guid.NewGuid();
 
         // Generate Player Grid
-        var playerGrid = GenerateGrid();
+        var (playerGrid, playerShips) = GenerateGrid();
 
         // Generate AI Grid (Secret)
-        var aiGrid = GenerateGrid();
+        var (aiGrid, _) = GenerateGrid();
 
         // Generate AI Moves Queue (Parity-based Strategy)
         var aiMoves = _aiService.GenerateAiMoves();
@@ -31,6 +31,7 @@ public class GameService : IGameService
             Id = gameId,
             Difficulty = difficulty,
             PlayerGrid = playerGrid,
+            PlayerShips = playerShips,
             AiGrid = aiGrid,
             AiMoves = aiMoves,
             OpponentGrid = InitEmptyBoolGrid(),
@@ -43,6 +44,7 @@ public class GameService : IGameService
         {
             GameId = gameId,
             PlayerGrid = playerGrid,
+            Ships = playerShips,
             OpponentGrid = game.OpponentGrid
         };
     }
@@ -218,6 +220,7 @@ public class GameService : IGameService
         {
             GameId = game.Id,
             PlayerGrid = game.PlayerGrid,
+            Ships = game.PlayerShips,
             OpponentGrid = game.OpponentGrid,
             Winner = game.Winner,
             LastAttackResult = game.LastAttackResult,
@@ -241,7 +244,7 @@ public class GameService : IGameService
         return $"{(char)('A' + row)}{col + 1}";
     }
 
-    private char[][] GenerateGrid()
+    private (char[][] Grid, List<ShipInfo> Ships) GenerateGrid()
     {
         // Initialize jagged array
         var grid = new char[10][];
@@ -250,6 +253,8 @@ public class GameService : IGameService
             grid[i] = new char[10];
             // Array is initialized to '\0' by default in C#
         }
+
+        var placedShips = new List<ShipInfo>();
 
         // Define ships: Letter and Size
         // Requirement: Ships A-F, Sizes 1-4
@@ -265,13 +270,17 @@ public class GameService : IGameService
 
         foreach (var ship in ships)
         {
-            PlaceShip(grid, ship.Letter, ship.Size);
+            var info = PlaceShip(grid, ship.Letter, ship.Size);
+            if (info != null)
+            {
+                placedShips.Add(info);
+            }
         }
 
-        return grid;
+        return (grid, placedShips);
     }
 
-    private void PlaceShip(char[][] grid, char letter, int size)
+    private ShipInfo? PlaceShip(char[][] grid, char letter, int size)
     {
         bool placed = false;
         int attempts = 0;
@@ -306,9 +315,17 @@ public class GameService : IGameService
             if (CanPlace(grid, row, col, size, horizontal))
             {
                 DoPlace(grid, row, col, size, horizontal, letter);
-                placed = true;
+                return new ShipInfo
+                {
+                    Letter = letter,
+                    Size = size,
+                    Row = row,
+                    Col = col,
+                    IsHorizontal = horizontal
+                };
             }
         }
+        return null;
     }
 
     private bool CanPlace(char[][] grid, int row, int col, int size, bool horizontal)

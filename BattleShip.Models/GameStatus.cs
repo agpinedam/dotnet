@@ -17,6 +17,8 @@ public class GameStatus
     /// </summary>
     public char[][] PlayerGrid { get; set; } = [];
 
+    public List<ShipInfo> Ships { get; set; } = new();
+
     /// <summary>
     /// The opponent's grid from the player's perspective.
     /// null = not fired upon

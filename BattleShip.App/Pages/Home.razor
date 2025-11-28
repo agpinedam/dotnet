@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using BattleShip.App.Services
+@using BattleShip.Models
 @inject GameClient GameClient
 
 <PageTitle>BattleShip</PageTitle>
@@ -7,6 +8,13 @@
 <h1>BattleShip</h1>
 
 <div class="mb-3">
+    <label class="form-label me-2">Difficulty:</label>
+    <select class="form-select d-inline-block w-auto me-3" @bind="selectedDifficulty">
+        <option value="@DifficultyLevel.Easy">Easy</option>
+        <option value="@DifficultyLevel.Medium">Medium</option>
+        <option value="@DifficultyLevel.Hard">Hard</option>
+    </select>
+
     <button class="btn btn-primary" @onclick="() => StartGame(false)">Start New Game (REST)</button>
     <button class="btn btn-secondary ms-2" @onclick="() => StartGame(true)">Start New Game (gRPC)</button>
     @if (GameClient.CurrentGame != null && !GameClient.CurrentGame.IsGameOver)
@@ -152,9 +160,11 @@
 </style>
 
 @code {
+    private DifficultyLevel selectedDifficulty = DifficultyLevel.Medium;
+
     private async Task StartGame(bool useGrpc)
     {
-        await GameClient.StartGameAsync(useGrpc);
+        await GameClient.StartGameAsync(useGrpc, selectedDifficulty);
     }
 
     private async Task Attack(int row, int col)

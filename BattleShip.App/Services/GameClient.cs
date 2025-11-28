@@ -20,24 +20,26 @@ public class GameClient
 
     private bool _useGrpc;
 
-    public async Task StartGameAsync(bool useGrpc = false)
+    public async Task StartGameAsync(bool useGrpc = false, DifficultyLevel difficulty = DifficultyLevel.Medium)
     {
         _useGrpc = useGrpc;
         try
         {
             if (useGrpc)
             {
-                var grpcGame = await _grpcClient.CreateGameAsync(new Empty());
+                var request = new GrpcCreateGameRequest { Difficulty = (int)difficulty };
+                var grpcGame = await _grpcClient.CreateGameAsync(request);
                 CurrentGame = MapFromGrpc(grpcGame);
-                Message = "Game Started (via gRPC)! Good luck.";
+                Message = $"Game Started (via gRPC, {difficulty})! Good luck.";
             }
             else
             {
-                var response = await _httpClient.PostAsync("/game", null);
+                var request = new CreateGameRequest { Difficulty = difficulty };
+                var response = await _httpClient.PostAsJsonAsync("/game", request);
                 if (response.IsSuccessStatusCode)
                 {
                     CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
-                    Message = "Game Started (via REST)! Good luck.";
+                    Message = $"Game Started (via REST, {difficulty})! Good luck.";
                 }
                 else
                 {
@@ -60,8 +62,6 @@ public class GameClient
             LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
             LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
             History = new List<MoveHistory>()
-            // IsGameOver is calculated property in model, but we can set it if we had a setter or just rely on Winner.
-            // But wait, IsGameOver is getter only based on Winner. So setting Winner is enough.
         };
 
         // Map Player Grid

@@ -5,9 +5,13 @@ option csharp_namespace = "BattleShip.Protos";
 package battleship;
 
 service Game {
-  rpc CreateGame (Empty) returns (GrpcGameStatus);
+  rpc CreateGame (GrpcCreateGameRequest) returns (GrpcGameStatus);
   rpc Attack (GrpcAttackRequest) returns (GrpcGameStatus);
   rpc Undo (GrpcUndoRequest) returns (GrpcGameStatus);
+}
+
+message GrpcCreateGameRequest {
+    int32 difficulty = 1;
 }
 
 message Empty {}

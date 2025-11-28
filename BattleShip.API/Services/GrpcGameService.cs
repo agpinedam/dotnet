@@ -17,9 +17,10 @@ public class GrpcGameService : Game.GameBase
         _undoValidator = undoValidator;
     }
 
-    public override Task<GrpcGameStatus> CreateGame(Empty request, ServerCallContext context)
+    public override Task<GrpcGameStatus> CreateGame(GrpcCreateGameRequest request, ServerCallContext context)
     {
-        var game = _gameService.CreateGame();
+        var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
+        var game = _gameService.CreateGame(difficulty);
         return Task.FromResult(MapToGrpc(game));
     }
 

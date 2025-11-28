@@ -13,7 +13,7 @@ public class GameService : IGameService
         _aiService = aiService;
     }
 
-    public GameStatus CreateGame()
+    public GameStatus CreateGame(DifficultyLevel difficulty)
     {
         var gameId = Guid.NewGuid();
 
@@ -29,6 +29,7 @@ public class GameService : IGameService
         var game = new InternalGame
         {
             Id = gameId,
+            Difficulty = difficulty,
             PlayerGrid = playerGrid,
             AiGrid = aiGrid,
             AiMoves = aiMoves,

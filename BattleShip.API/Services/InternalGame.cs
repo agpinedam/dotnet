@@ -12,6 +12,7 @@ public class InternalGame
     public string? Winner { get; set; }
     public string? LastAttackResult { get; set; }
     public string? LastAiAttackResult { get; set; }
+    public DifficultyLevel Difficulty { get; set; } = DifficultyLevel.Medium;
     
     public List<MoveHistory> History { get; set; } = new();
     public Stack<InternalGame> PreviousStates { get; set; } = new();
@@ -29,6 +30,7 @@ public class InternalGame
             Winner = this.Winner,
             LastAttackResult = this.LastAttackResult,
             LastAiAttackResult = this.LastAiAttackResult,
+            Difficulty = this.Difficulty,
             History = new List<MoveHistory>(this.History),
             AiMoves = new Queue<(int, int)>(this.AiMoves),
             TargetStack = new Stack<(int, int)>(this.TargetStack.Reverse()), // Reverse to preserve order when pushing

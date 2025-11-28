@@ -1,5 +1,12 @@
 # BattleShip Game
 
+## Autors
+- **Name**: Fadia ALLANI
+- **Email**: fadia.allani@etu.mines-ales.fr
+
+- **Name**: Angie Giceth PINEDA MENDOZA
+- **Email**: angie-giceth.pineda-mendoza@etu.mines-ales.fr
+
 ## Project Structure
 
 - **BattleShip.API**: ASP.NET Core Web API (Backend).

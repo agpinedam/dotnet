@@ -48,45 +48,87 @@ public class AiService : IAiService
         int aiRow = -1, aiCol = -1;
         bool foundMove = false;
 
-        // 1. Priority: Check Target Stack (Hunt Mode)
-        while (game.TargetStack.Count > 0)
+        // 1. Priority: Check Target Stack (Hunt Mode) - Only for Medium and Hard
+        if (game.Difficulty != DifficultyLevel.Easy)
         {
-            var (r, c) = game.TargetStack.Pop();
-            if (IsValidAttack(game.PlayerGrid, r, c))
+            while (game.TargetStack.Count > 0)
             {
-                aiRow = r;
-                aiCol = c;
-                foundMove = true;
-                break;
+                var (r, c) = game.TargetStack.Pop();
+                if (IsValidAttack(game.PlayerGrid, r, c))
+                {
+                    aiRow = r;
+                    aiCol = c;
+                    foundMove = true;
+                    break;
+                }
             }
         }
 
-        // 2. Fallback: Check Heatmap (Search Mode - Probability Density)
+        // 2. Fallback: Search Mode
         if (!foundMove)
         {
-            var bestMove = GetBestHeatmapMove(game);
-            if (bestMove.HasValue)
+            if (game.Difficulty == DifficultyLevel.Hard)
             {
-                aiRow = bestMove.Value.Row;
-                aiCol = bestMove.Value.Col;
-                foundMove = true;
-            }
-            else
-            {
-                // Fallback to random if heatmap fails (shouldn't happen if board not full)
-                while (game.AiMoves.Count > 0)
+                // Hard: Heatmap Strategy with Parity Optimization (Smarter)
+                var bestMove = GetBestHeatmapMove(game, useParity: true);
+                if (bestMove.HasValue)
                 {
-                    var (r, c) = game.AiMoves.Dequeue();
+                    aiRow = bestMove.Value.Row;
+                    aiCol = bestMove.Value.Col;
+                    foundMove = true;
+                }
+            }
+            else if (game.Difficulty == DifficultyLevel.Medium)
+            {
+                // Medium: Heatmap Strategy without Parity
+                var bestMove = GetBestHeatmapMove(game, useParity: false);
+                if (bestMove.HasValue)
+                {
+                    aiRow = bestMove.Value.Row;
+                    aiCol = bestMove.Value.Col;
+                    foundMove = true;
+                }
+            }
+            
+            // Easy (or fallback if queues empty): Random Random
+            if (!foundMove)
+            {
+                // Simple random search
+                int attempts = 0;
+                while (!foundMove && attempts < 1000)
+                {
+                    attempts++;
+                    int r = Random.Shared.Next(10);
+                    int c = Random.Shared.Next(10);
                     if (IsValidAttack(game.PlayerGrid, r, c))
                     {
                         aiRow = r;
                         aiCol = c;
                         foundMove = true;
-                        break;
+                    }
+                }
+                
+                // Last resort: linear scan
+                if (!foundMove)
+                {
+                    for (int r = 0; r < 10; r++)
+                    {
+                        for (int c = 0; c < 10; c++)
+                        {
+                            if (IsValidAttack(game.PlayerGrid, r, c))
+                            {
+                                aiRow = r;
+                                aiCol = c;
+                                foundMove = true;
+                                goto MoveFound;
+                            }
+                        }
                     }
                 }
             }
         }
+
+        MoveFound:
 
         if (!foundMove)
         {
@@ -105,7 +147,10 @@ public class AiService : IAiService
             aiResult = "Hit!";
             
             // Update Intelligence
-            game.CurrentShipHits.Add((aiRow, aiCol, shipLetter));
+            if (game.Difficulty != DifficultyLevel.Easy)
+            {
+                game.CurrentShipHits.Add((aiRow, aiCol, shipLetter));
+            }
             
             // Check if Sunk
             if (IsShipSunk(game.PlayerGrid, shipLetter))
@@ -116,28 +161,34 @@ public class AiService : IAiService
                 int size = GetShipSize(shipLetter);
                 game.AlivePlayerShips.Remove(size);
                 
-                // Remove hits belonging to the sunk ship
-                game.CurrentShipHits.RemoveAll(h => h.Item3 == shipLetter);
-
-                // Clear Target Stack (Reset to Search Mode or handle adjacent ships)
-                game.TargetStack.Clear();
-
-                // If we have remaining hits (from another ship), regenerate neighbors for them
-                if (game.CurrentShipHits.Count > 0)
+                if (game.Difficulty != DifficultyLevel.Easy)
                 {
-                    foreach (var hit in game.CurrentShipHits)
+                    // Remove hits belonging to the sunk ship
+                    game.CurrentShipHits.RemoveAll(h => h.Item3 == shipLetter);
+
+                    // Clear Target Stack (Reset to Search Mode or handle adjacent ships)
+                    game.TargetStack.Clear();
+
+                    // If we have remaining hits (from another ship), regenerate neighbors for them
+                    if (game.CurrentShipHits.Count > 0)
                     {
-                        AddSmartNeighbors(game, hit.Item1, hit.Item2);
+                        foreach (var hit in game.CurrentShipHits)
+                        {
+                            AddSmartNeighbors(game, hit.Item1, hit.Item2);
+                        }
+                        // Re-apply filter if applicable
+                        FilterTargetStack(game);
                     }
-                    // Re-apply filter if applicable
-                    FilterTargetStack(game);
                 }
             }
             else
             {
                 // Not sunk, add neighbors to stack
-                AddSmartNeighbors(game, aiRow, aiCol);
-                FilterTargetStack(game);
+                if (game.Difficulty != DifficultyLevel.Easy)
+                {
+                    AddSmartNeighbors(game, aiRow, aiCol);
+                    FilterTargetStack(game);
+                }
             }
         }
         else
@@ -305,7 +356,7 @@ public class AiService : IAiService
         return $"{(char)('A' + row)}{col + 1}";
     }
 
-    private (int Row, int Col)? GetBestHeatmapMove(InternalGame game)
+    private (int Row, int Col)? GetBestHeatmapMove(InternalGame game, bool useParity)
     {
         int[][] heatmap = new int[10][];
         for (int i = 0; i < 10; i++) heatmap[i] = new int[10];
@@ -326,6 +377,22 @@ public class AiService : IAiService
                     if (CanPlaceShip(game.PlayerGrid, r, c, shipSize, false))
                     {
                         for (int k = 0; k < shipSize; k++) heatmap[r + k][c]++;
+                    }
+                }
+            }
+        }
+
+        // Apply Parity Mask if requested and smallest ship > 1
+        // If smallest ship is 1, parity doesn't help (we must check every cell)
+        if (useParity && game.AlivePlayerShips.Count > 0 && game.AlivePlayerShips.Min() > 1)
+        {
+            for (int r = 0; r < 10; r++)
+            {
+                for (int c = 0; c < 10; c++)
+                {
+                    if ((r + c) % 2 != 0)
+                    {
+                        heatmap[r][c] = 0; // Zero out odd cells
                     }
                 }
             }

@@ -38,9 +38,9 @@ app.MapGet("/", () => "BattleShip API is running!");
 // Map gRPC Service
 app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
 
-app.MapPost("/game", Ok<GameStatus> (IGameService gameService) =>
+app.MapPost("/game", Ok<GameStatus> (CreateGameRequest request, IGameService gameService) =>
 {
-    var game = gameService.CreateGame();
+    var game = gameService.CreateGame(request.Difficulty);
     return TypedResults.Ok(game);
 });
 

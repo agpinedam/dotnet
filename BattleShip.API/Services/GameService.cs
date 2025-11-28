@@ -4,8 +4,14 @@ namespace BattleShip.API.Services;
 
 public class GameService : IGameService
 {
+    private readonly IAiService _aiService;
     // In-memory storage for the game states (including the secret AI grid)
     private static readonly Dictionary<Guid, InternalGame> _games = new();
+
+    public GameService(IAiService aiService)
+    {
+        _aiService = aiService;
+    }
 
     public GameStatus CreateGame()
     {
@@ -17,22 +23,8 @@ public class GameService : IGameService
         // Generate AI Grid (Secret)
         var aiGrid = GenerateGrid();
 
-        // Generate AI Moves Queue (Shuffled)
-        var aiMoves = new Queue<(int, int)>();
-        var allMoves = new List<(int, int)>();
-        for (int r = 0; r < 10; r++)
-        {
-            for (int c = 0; c < 10; c++)
-            {
-                allMoves.Add((r, c));
-            }
-        }
-        // Shuffle
-        var shuffledMoves = allMoves.OrderBy(_ => Random.Shared.Next()).ToList();
-        foreach (var move in shuffledMoves)
-        {
-            aiMoves.Enqueue(move);
-        }
+        // Generate AI Moves Queue (Parity-based Strategy)
+        var aiMoves = _aiService.GenerateAiMoves();
 
         var game = new InternalGame
         {
@@ -40,7 +32,8 @@ public class GameService : IGameService
             PlayerGrid = playerGrid,
             AiGrid = aiGrid,
             AiMoves = aiMoves,
-            OpponentGrid = InitEmptyBoolGrid()
+            OpponentGrid = InitEmptyBoolGrid(),
+            AlivePlayerShips = new List<int> { 4, 3, 3, 2, 2, 1 }
         };
 
         _games[gameId] = game;
@@ -114,31 +107,13 @@ public class GameService : IGameService
         }
 
         // AI Turn
-        if (game.AiMoves.Count > 0)
+        var (aiMove, aiResult) = _aiService.PerformAiTurn(game);
+        
+        if (aiMove != null)
         {
-            var (aiRow, aiCol) = game.AiMoves.Dequeue();
-            currentTurn.AiMove = GetCoordinateString(aiRow, aiCol);
-            
-            char target = game.PlayerGrid[aiRow][aiCol];
-            string aiResult;
-            
-            if (target != '\0' && target != 'X' && target != 'O')
-            {
-                game.PlayerGrid[aiRow][aiCol] = 'X'; // Hit
-                aiResult = "Hit!";
-                game.LastAiAttackResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Hit!";
-            }
-            else
-            {
-                // Only mark as miss if it wasn't already hit/miss (though AI shouldn't repeat moves with current logic)
-                if (game.PlayerGrid[aiRow][aiCol] == '\0')
-                {
-                    game.PlayerGrid[aiRow][aiCol] = 'O'; // Miss
-                }
-                aiResult = "Miss";
-                game.LastAiAttackResult = $"AI attacked {GetCoordinateString(aiRow, aiCol)}: Miss";
-            }
-            currentTurn.AiResult = aiResult;
+            currentTurn.AiMove = aiMove;
+            currentTurn.AiResult = aiResult ?? string.Empty;
+            game.LastAiAttackResult = $"AI attacked {aiMove}: {aiResult}";
 
             // Check AI Win
             if (CheckWin(game.PlayerGrid))
@@ -151,6 +126,15 @@ public class GameService : IGameService
 
         return GetGameStatus(game);
     }
+
+    private bool IsValidAttack(char[][] grid, int r, int c)
+    {
+        if (r < 0 || r >= 10 || c < 0 || c >= 10) return false;
+        char cell = grid[r][c];
+        return cell != 'X' && cell != 'O';
+    }
+
+    // IsShipSunk, GetShipSize, AddSmartNeighbors, CanFitShip, FilterTargetStack removed (moved to AiService)
 
     public GameStatus Undo(Guid gameId)
     {
@@ -172,6 +156,41 @@ public class GameService : IGameService
         }
 
         return GetGameStatus(game);
+    }
+
+    public GameStatus UndoToTurn(Guid gameId, int turn)
+    {
+        if (!_games.TryGetValue(gameId, out var game))
+        {
+            throw new ArgumentException("Game not found");
+        }
+
+        int currentTurn = game.History.Count;
+        int stepsToUndo = currentTurn - turn;
+
+        if (stepsToUndo <= 0)
+        {
+            return GetGameStatus(game);
+        }
+
+        InternalGame targetState = game;
+        
+        for (int i = 0; i < stepsToUndo; i++)
+        {
+            if (targetState.PreviousStates.Count > 0)
+            {
+                var tempStack = targetState.PreviousStates; // The stack to continue popping from
+                targetState = tempStack.Pop();
+                targetState.PreviousStates = tempStack; // Restore the stack reference
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        _games[gameId] = targetState;
+        return GetGameStatus(targetState);
     }
 
     private bool CheckWin(char[][] grid)
@@ -325,42 +344,6 @@ public class GameService : IGameService
             {
                 grid[r][col] = letter;
             }
-        }
-    }
-
-    // Internal class to hold the full game state
-    private class InternalGame
-    {
-        public Guid Id { get; set; }
-        public char[][] PlayerGrid { get; set; } = [];
-        public char[][] AiGrid { get; set; } = [];
-        public bool?[][] OpponentGrid { get; set; } = [];
-        public Queue<(int, int)> AiMoves { get; set; } = new();
-        public string? Winner { get; set; }
-        public string? LastAttackResult { get; set; }
-        public string? LastAiAttackResult { get; set; }
-        
-        public List<MoveHistory> History { get; set; } = new();
-        public Stack<InternalGame> PreviousStates { get; set; } = new();
-
-        public InternalGame DeepCopy()
-        {
-            var copy = new InternalGame
-            {
-                Id = this.Id,
-                Winner = this.Winner,
-                LastAttackResult = this.LastAttackResult,
-                LastAiAttackResult = this.LastAiAttackResult,
-                History = new List<MoveHistory>(this.History),
-                AiMoves = new Queue<(int, int)>(this.AiMoves),
-            };
-
-            // Deep copy arrays
-            copy.PlayerGrid = this.PlayerGrid.Select(r => (char[])r.Clone()).ToArray();
-            copy.AiGrid = this.AiGrid.Select(r => (char[])r.Clone()).ToArray();
-            copy.OpponentGrid = this.OpponentGrid.Select(r => (bool?[])r.Clone()).ToArray();
-
-            return copy;
         }
     }
 }

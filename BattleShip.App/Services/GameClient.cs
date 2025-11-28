@@ -191,4 +191,38 @@ public class GameClient
             Message = $"Error: {ex.Message}";
         }
     }
+
+    public async Task UndoToTurnAsync(int turn)
+    {
+        if (CurrentGame == null) return;
+
+        try
+        {
+            if (_useGrpc)
+            {
+                // Fallback for gRPC: Loop Undo until we reach the target turn
+                while (CurrentGame != null && CurrentGame.History.Count > turn)
+                {
+                    await UndoAsync();
+                }
+            }
+            else
+            {
+                var response = await _httpClient.PostAsync($"/game/{CurrentGame.GameId}/undo-to-turn/{turn}", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
+                    Message = $"Reverted to turn {turn}.";
+                }
+                else
+                {
+                    Message = "Undo to turn failed.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error: {ex.Message}";
+        }
+    }
 }

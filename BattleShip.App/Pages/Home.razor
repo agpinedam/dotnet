@@ -101,7 +101,7 @@
                             <tbody>
                             @foreach (var move in ((IEnumerable<Models.MoveHistory>)GameClient.CurrentGame.History).Reverse())
                             {
-                                <tr @onclick="() => UndoToTurn(move.Turn)" style="cursor:pointer;">
+                                <tr @onclick="() => UndoToTurn(move.Turn - 1)" style="cursor:pointer;">
                                     <td>@move.Turn</td>
                                     <td>@move.PlayerMove</td>
                                     <td>@move.PlayerResult</td>
@@ -174,10 +174,7 @@
     
     private async Task UndoToTurn(int turn)
     {
-        while (GameClient.CurrentGame != null && GameClient.CurrentGame.History.Last().Turn > turn)
-        {
-            await GameClient.UndoAsync();
-        }
+        await GameClient.UndoToTurnAsync(turn);
     }
 
 }

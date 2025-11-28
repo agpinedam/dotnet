@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddSingleton<IAiService, AiService>();
 builder.Services.AddSingleton<IGameService, GameService>();
 builder.Services.AddScoped<IValidator<AttackRequest>, AttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcAttackRequest>, GrpcAttackRequestValidator>();
@@ -67,6 +68,19 @@ app.MapPost("/game/{id}/undo", Results<Ok<GameStatus>, NotFound<string>> (Guid i
     try
     {
         var game = gameService.Undo(id);
+        return TypedResults.Ok(game);
+    }
+    catch (ArgumentException)
+    {
+        return TypedResults.NotFound("Game not found");
+    }
+});
+
+app.MapPost("/game/{id}/undo-to-turn/{turn}", Results<Ok<GameStatus>, NotFound<string>> (Guid id, int turn, IGameService gameService) =>
+{
+    try
+    {
+        var game = gameService.UndoToTurn(id, turn);
         return TypedResults.Ok(game);
     }
     catch (ArgumentException)

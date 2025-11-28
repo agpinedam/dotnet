@@ -40,7 +40,7 @@ app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
 
 app.MapPost("/game", Ok<GameStatus> (CreateGameRequest request, IGameService gameService) =>
 {
-    var game = gameService.CreateGame(request.Difficulty);
+    var game = gameService.CreateGame(request.Difficulty, request.GridSize);
     return TypedResults.Ok(game);
 });
 

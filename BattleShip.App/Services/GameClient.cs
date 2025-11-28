@@ -20,7 +20,7 @@ public class GameClient
 
     private bool _useGrpc;
 
-    public async Task StartGameAsync(bool useGrpc = false, DifficultyLevel difficulty = DifficultyLevel.Medium)
+    public async Task StartGameAsync(bool useGrpc = false, DifficultyLevel difficulty = DifficultyLevel.Medium, int gridSize = 10)
     {
         _useGrpc = useGrpc;
         try
@@ -34,7 +34,7 @@ public class GameClient
             }
             else
             {
-                var request = new CreateGameRequest { Difficulty = difficulty };
+                var request = new CreateGameRequest { Difficulty = difficulty, GridSize = gridSize };
                 var response = await _httpClient.PostAsJsonAsync("/game", request);
                 if (response.IsSuccessStatusCode)
                 {

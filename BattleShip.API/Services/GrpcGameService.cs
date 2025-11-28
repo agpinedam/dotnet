@@ -20,7 +20,7 @@ public class GrpcGameService : Game.GameBase
     public override Task<GrpcGameStatus> CreateGame(GrpcCreateGameRequest request, ServerCallContext context)
     {
         var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
-        var game = _gameService.CreateGame(difficulty);
+        var game = _gameService.CreateGame(difficulty, 10);
         return Task.FromResult(MapToGrpc(game));
     }
 

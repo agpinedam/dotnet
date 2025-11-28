@@ -13,15 +13,15 @@ public class GameService : IGameService
         _aiService = aiService;
     }
 
-    public GameStatus CreateGame(DifficultyLevel difficulty)
+    public GameStatus CreateGame(DifficultyLevel difficulty, int gridSize)
     {
         var gameId = Guid.NewGuid();
 
         // Generate Player Grid
-        var (playerGrid, playerShips) = GenerateGrid();
+        var (playerGrid, playerShips) = GenerateGrid(gridSize);
 
         // Generate AI Grid (Secret)
-        var (aiGrid, _) = GenerateGrid();
+        var (aiGrid, _) = GenerateGrid(gridSize);
 
         // Generate AI Moves Queue (Parity-based Strategy)
         var aiMoves = _aiService.GenerateAiMoves();
@@ -236,13 +236,13 @@ public class GameService : IGameService
         return $"{(char)('A' + row)}{col + 1}";
     }
 
-    private (char[][] Grid, List<ShipInfo> Ships) GenerateGrid()
+    private (char[][] Grid, List<ShipInfo> Ships) GenerateGrid(int gridSize)
     {
         // Initialize jagged array
-        var grid = new char[10][];
-        for (int i = 0; i < 10; i++)
+        var grid = new char[gridSize][];
+        for (int i = 0; i < gridSize; i++)
         {
-            grid[i] = new char[10];
+            grid[i] = new char[gridSize];
             // Array is initialized to '\0' by default in C#
         }
 

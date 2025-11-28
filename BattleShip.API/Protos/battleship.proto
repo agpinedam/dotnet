@@ -43,6 +43,15 @@ message GrpcGameStatus {
   string lastAttackResult = 6;
   string lastAiAttackResult = 7;
   repeated GrpcMoveHistory history = 8;
+  repeated GrpcShipInfo ships = 9;
+}
+
+message GrpcShipInfo {
+    string letter = 1;
+    int32 size = 2;
+    int32 row = 3;
+    int32 col = 4;
+    bool isHorizontal = 5;
 }
 
 message OpponentRow {

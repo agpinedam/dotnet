@@ -100,6 +100,20 @@ public class GameClient
             });
         }
 
+        // Map Ships
+        game.Ships = new List<ShipInfo>();
+        foreach (var s in grpcGame.Ships)
+        {
+            game.Ships.Add(new ShipInfo
+            {
+                Letter = s.Letter[0],
+                Size = s.Size,
+                Row = s.Row,
+                Col = s.Col,
+                IsHorizontal = s.IsHorizontal
+            });
+        }
+
         return game;
     }
 

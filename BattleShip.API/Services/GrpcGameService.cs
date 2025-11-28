@@ -115,6 +115,22 @@ public class GrpcGameService : Game.GameBase
             }
         }
 
+        // Map Ships
+        if (game.Ships != null)
+        {
+            foreach (var ship in game.Ships)
+            {
+                grpcGame.Ships.Add(new GrpcShipInfo
+                {
+                    Letter = ship.Letter.ToString(),
+                    Size = ship.Size,
+                    Row = ship.Row,
+                    Col = ship.Col,
+                    IsHorizontal = ship.IsHorizontal
+                });
+            }
+        }
+
         return grpcGame;
     }
 }

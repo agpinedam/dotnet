@@ -243,7 +243,7 @@ public class GameService : IGameService
         for (int i = 0; i < gridSize; i++)
         {
             grid[i] = new char[gridSize];
-            // Array is initialized to '\0' by default in C#
+            
         }
 
         var placedShips = new List<ShipInfo>();
@@ -290,10 +290,7 @@ public class GameService : IGameService
 
             if (horizontal)
             {
-                // Ensure it fits horizontally
-                // col must be between 0 and 10 - size
-                // Random.Shared.Next(max) returns 0 to max-1
-                // We want 0 to (10-size). So max should be (10-size) + 1
+           
                 col = Random.Shared.Next(cols - size + 1);
                 row = Random.Shared.Next(rows);
             }

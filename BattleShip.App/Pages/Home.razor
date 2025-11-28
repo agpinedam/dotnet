@@ -19,6 +19,7 @@
         <option value="10">10x10</option>
         <option value="12">12x12</option>
         <option value="15">15x15</option>
+        <option value="20">20x20</option>
     </select>
 
     <button class="btn btn-primary" @onclick="() => StartGame(false)">Start New Game (REST)</button>
@@ -73,10 +74,10 @@
                                     transform: @rotation;" alt=""/>
                     }
 
-                    @for (int r = 0; r < 10; r++)
+                    @for (int r = 0; r < GameClient.CurrentGame.PlayerGrid.Length; r++)
                     {
                         <div class="grid-row">
-                            @for (int c = 0; c < 10; c++)
+                            @for (int c = 0; c < GameClient.CurrentGame.PlayerGrid[r].Length; c++)
                             {
                                 var cell = GameClient.CurrentGame.PlayerGrid[r][c];
                                 <div class="grid-cell" style="z-index: 2; background-color: transparent;">
@@ -99,10 +100,10 @@
             <div class="col-md-6">
                 <h3>Opponent Grid</h3>
                 <div class="battleship-grid">
-                    @for (int r = 0; r < 10; r++)
+                    @for (int r = 0; r < GameClient.CurrentGame.OpponentGrid.Length; r++)
                     {
                         <div class="grid-row">
-                            @for (int c = 0; c < 10; c++)
+                            @for (int c = 0; c < GameClient.CurrentGame.OpponentGrid[r].Length; c++)
                             {
                                 int row = r;
                                 int col = c;

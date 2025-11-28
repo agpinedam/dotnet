@@ -9,7 +9,7 @@
 
 <div class="mb-3">
     <label class="form-label me-2">Difficulty:</label>
-    <select class="form-select d-inline-block w-auto me-3" @bind="selectedDifficulty">
+    <select class="form-select d-inline-block w-auto me-3" @bind="_selectedDifficulty">
         <option value="@DifficultyLevel.Easy">Easy</option>
         <option value="@DifficultyLevel.Medium">Medium</option>
         <option value="@DifficultyLevel.Hard">Hard</option>
@@ -40,33 +40,31 @@
                             4 => "ship4.png",
                             3 => "ship3.png", 
                             2 => "ship2.png",
-                            1 => "ship1.png",
                             _ => "ship1.png"
                         };
 
-                        const int CellSize = 35; 
+                        const int cellSize = 35; 
                         
                         // Positioning
-                        var top = ship.Row * CellSize; 
-                        var left = ship.Col * CellSize;
+                        var top = ship.Row * cellSize; 
+                        var left = ship.Col * cellSize;
                         
                         // Fill ship size
-                        var height = ship.Size * CellSize; 
+                        var height = ship.Size * cellSize; 
                         
                         // Rotation logic
                         var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
 
-                        <img src="/images/@shipImage" 
-                            style="position: absolute; 
+                        <img src="/images/@shipImage" style="position: absolute; 
                                     top: @(top)px; 
                                     left: @(left)px; 
-                                    width: @(CellSize)px; 
+                                    width: @(cellSize)px; 
                                     height: @(height)px; 
                                     z-index: 1;
                                     pointer-events: none;
                                     /* El punto de pivote debe ser exactamente el centro de la PRIMERA celda */
                                     transform-origin: 17.5px 17.5px;
-                                    transform: @rotation;" />
+                                    transform: @rotation;" alt=""/>
                     }
 
                     @for (int r = 0; r < 10; r++)
@@ -139,7 +137,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                            @foreach (var move in ((IEnumerable<Models.MoveHistory>)GameClient.CurrentGame.History).Reverse())
+                            @foreach (var move in ((IEnumerable<MoveHistory>)GameClient.CurrentGame.History).Reverse())
                             {
                                 <tr @onclick="() => UndoToTurn(move.Turn - 1)" style="cursor:pointer;">
                                     <td>@move.Turn</td>
@@ -203,11 +201,11 @@
 </style>
 
 @code {
-    private DifficultyLevel selectedDifficulty = DifficultyLevel.Medium;
+    private DifficultyLevel _selectedDifficulty = DifficultyLevel.Medium;
 
     private async Task StartGame(bool useGrpc)
     {
-        await GameClient.StartGameAsync(useGrpc, selectedDifficulty);
+        await GameClient.StartGameAsync(useGrpc, _selectedDifficulty);
     }
 
     private async Task Attack(int row, int col)

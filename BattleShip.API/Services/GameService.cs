@@ -6,7 +6,7 @@ public class GameService : IGameService
 {
     private readonly IAiService _aiService;
     // In-memory storage for the game states (including the secret AI grid)
-    private static readonly Dictionary<Guid, InternalGame> _games = new();
+    private static readonly Dictionary<Guid, InternalGame> Games = new();
 
     public GameService(IAiService aiService)
     {
@@ -38,7 +38,7 @@ public class GameService : IGameService
             AlivePlayerShips = new List<int> { 4, 3, 3, 2, 2, 1 }
         };
 
-        _games[gameId] = game;
+        Games[gameId] = game;
 
         return new GameStatus
         {
@@ -51,7 +51,7 @@ public class GameService : IGameService
 
     public GameStatus Attack(Guid gameId, int row, int col)
     {
-        if (!_games.TryGetValue(gameId, out var game))
+        if (!Games.TryGetValue(gameId, out var game))
         {
             throw new ArgumentException("Game not found");
         }
@@ -71,7 +71,7 @@ public class GameService : IGameService
         };
 
         // Player Attack
-        string attackResult = "Miss";
+        string attackResult;
         if (row >= 0 && row < 10 && col >= 0 && col < 10)
         {
             char target = game.AiGrid[row][col];
@@ -130,18 +130,10 @@ public class GameService : IGameService
         return GetGameStatus(game);
     }
 
-    private bool IsValidAttack(char[][] grid, int r, int c)
-    {
-        if (r < 0 || r >= 10 || c < 0 || c >= 10) return false;
-        char cell = grid[r][c];
-        return cell != 'X' && cell != 'O';
-    }
-
-    // IsShipSunk, GetShipSize, AddSmartNeighbors, CanFitShip, FilterTargetStack removed (moved to AiService)
 
     public GameStatus Undo(Guid gameId)
     {
-        if (!_games.TryGetValue(gameId, out var game))
+        if (!Games.TryGetValue(gameId, out var game))
         {
             throw new ArgumentException("Game not found");
         }
@@ -153,7 +145,7 @@ public class GameService : IGameService
             previousState.PreviousStates = game.PreviousStates;
             
             // 4. Update the dictionary
-            _games[gameId] = previousState;
+            Games[gameId] = previousState;
             
             return GetGameStatus(previousState);
         }
@@ -163,7 +155,7 @@ public class GameService : IGameService
 
     public GameStatus UndoToTurn(Guid gameId, int turn)
     {
-        if (!_games.TryGetValue(gameId, out var game))
+        if (!Games.TryGetValue(gameId, out var game))
         {
             throw new ArgumentException("Game not found");
         }
@@ -192,7 +184,7 @@ public class GameService : IGameService
             }
         }
 
-        _games[gameId] = targetState;
+        Games[gameId] = targetState;
         return GetGameStatus(targetState);
     }
 

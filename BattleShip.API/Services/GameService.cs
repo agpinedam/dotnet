@@ -34,7 +34,7 @@ public class GameService : IGameService
             PlayerShips = playerShips,
             AiGrid = aiGrid,
             AiMoves = aiMoves,
-            OpponentGrid = InitEmptyBoolGrid(),
+            OpponentGrid = InitEmptyBoolGrid(gridSize),
             AlivePlayerShips = new List<int> { 4, 3, 3, 2, 2, 1 }
         };
 
@@ -49,7 +49,7 @@ public class GameService : IGameService
         };
     }
 
-    public GameStatus Attack(Guid gameId, int row, int col)
+    public GameStatus Attack(Guid gameId, int row, int col, int gridSize)
     {
         if (!Games.TryGetValue(gameId, out var game))
         {
@@ -72,7 +72,7 @@ public class GameService : IGameService
 
         // Player Attack
         string attackResult;
-        if (row >= 0 && row < 10 && col >= 0 && col < 10)
+        if (row >= 0 && row < gridSize && col >= 0 && col < gridSize)
         {
             char target = game.AiGrid[row][col];
             
@@ -188,13 +188,13 @@ public class GameService : IGameService
         return GetGameStatus(targetState);
     }
 
-    private bool CheckWin(char[][] grid)
+    private bool CheckWin(char[][] grid, int gridSize = 10)
     {
         // Check if any ship parts (A-F) remain.
         // If we find any character that is NOT '\0', 'X', or 'O', it means a ship is still alive.
-        for (int r = 0; r < 10; r++)
+        for (int r = 0; r < gridSize; r++)
         {
-            for (int c = 0; c < 10; c++)
+            for (int c = 0; c < gridSize; c++)
             {
                 char cell = grid[r][c];
                 if (cell != '\0' && cell != 'X' && cell != 'O')
@@ -221,12 +221,12 @@ public class GameService : IGameService
         };
     }
 
-    private bool?[][] InitEmptyBoolGrid()
+    private bool?[][] InitEmptyBoolGrid(int gridSize )
     {
-        var grid = new bool?[10][];
-        for (int i = 0; i < 10; i++)
+        var grid = new bool?[gridSize][];
+        for (int i = 0; i < gridSize; i++)
         {
-            grid[i] = new bool?[10];
+            grid[i] = new bool?[gridSize];
         }
         return grid;
     }
@@ -272,7 +272,7 @@ public class GameService : IGameService
         return (grid, placedShips);
     }
 
-    private ShipInfo? PlaceShip(char[][] grid, char letter, int size)
+    private ShipInfo? PlaceShip(char[][] grid, char letter, int size, int gridSize = 10)
     {
         bool placed = false;
         int attempts = 0;
@@ -283,8 +283,8 @@ public class GameService : IGameService
             bool horizontal = Random.Shared.Next(2) == 0;
 
             // Grid dimensions
-            int rows = 10;
-            int cols = 10;
+            int rows = gridSize;
+            int cols = gridSize;
 
             int row, col;
 

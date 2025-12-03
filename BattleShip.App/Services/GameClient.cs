@@ -57,7 +57,7 @@ public class GameClient
     {
         var game = new GameStatus
         {
-            GameId = Guid.Parse(grpcGame.GameId),
+            GameId = grpcGame.GameId,
             Winner = string.IsNullOrEmpty(grpcGame.Winner) ? null : grpcGame.Winner,
             LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
             LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
@@ -130,7 +130,7 @@ public class GameClient
             }
             else
             {
-                var request = new PlaceShipsRequest { GameId = CurrentGame.GameId, Ships = ships };
+                var request = new PlaceShipsRequest { GameId = Guid.Parse(CurrentGame.GameId), Ships = ships };
                 var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/place-ships", request);
                 
                 if (response.IsSuccessStatusCode)

@@ -8,7 +8,7 @@ public class GameStatus
     /// <summary>
     /// Unique identifier for the game.
     /// </summary>
-    public Guid GameId { get; set; }
+    public string? GameId { get; set; }
 
     /// <summary>
     /// The current state of the game (Setup, Playing, GameOver).
@@ -25,7 +25,7 @@ public class GameStatus
     public List<ShipInfo> Ships { get; set; } = new();
 
     /// <summary>
-    /// The opponent's grid from the player's perspective.
+    // The opponent's grid from the player's perspective.
     /// null = not fired upon
     /// true = hit
     /// false = miss (water)
@@ -41,7 +41,17 @@ public class GameStatus
     /// <summary>
     /// Indicates if the game is over.
     /// </summary>
-    public bool IsGameOver => !string.IsNullOrEmpty(Winner);
+    public bool IsGameOver { get; set; }
+    
+    /// <summary>
+    /// For multiplayer, indicates if it is the current player's turn.
+    /// </summary>
+    public bool IsMyTurn { get; set; }
+
+    /// <summary>
+    /// For multiplayer, indicates if the current player has placed their ships.
+    /// </summary>
+    public bool ShipsPlaced { get; set; }
 
     /// <summary>
     /// Result of the last attack by the player (e.g., "Hit", "Miss", "Sunk").

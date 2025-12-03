@@ -2,67 +2,76 @@
 @using BattleShip.App.Services
 @using BattleShip.Models
 @using BattleShip.App.Components
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.Configuration
 @inject GameClient GameClient
+@inject NavigationManager NavigationManager
+@inject IConfiguration Configuration
+@implements IAsyncDisposable
 
 <PageTitle>BattleShip</PageTitle>
 
 <h1>BattleShip</h1>
 
 <div class="mb-3 control-panel">
-    <div class="d-flex align-items-center flex-wrap gap-2">
-        <label class="form-label fw-bold">Difficulty:</label>
-        <select class="form-select w-auto" @bind="_selectedDifficulty">
-            <option value="@DifficultyLevel.Easy">Easy</option>
-            <option value="@DifficultyLevel.Medium">Medium</option>
-            <option value="@DifficultyLevel.Hard">Hard</option>
-        </select>
+    @if (CurrentGame == null)
+    {
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <label class="form-label fw-bold">Difficulty:</label>
+            <select class="form-select w-auto" @bind="_selectedDifficulty">
+                <option value="@DifficultyLevel.Easy">Easy</option>
+                <option value="@DifficultyLevel.Medium">Medium</option>
+                <option value="@DifficultyLevel.Hard">Hard</option>
+            </select>
 
-        <label class="form-label fw-bold ms-2">Grid Size:</label>
-        <select class="form-select w-auto" @bind="_selectGridSize">
-            <option value="10">10x10</option>
-            <option value="12">12x12</option>
-            <option value="15">15x15</option>
-            <option value="20">20x20</option>
-        </select>
+            <label class="form-label fw-bold ms-2">Grid Size:</label>
+            <select class="form-select w-auto" @bind="_selectGridSize">
+                <option value="10">10x10</option>
+                <option value="12">12x12</option>
+                <option value="15">15x15</option>
+                <option value="20">20x20</option>
+            </select>
 
-        <div class="ms-3 border-start ps-3">
-            <button class="btn btn-primary" @onclick="() => StartGame(false)">New Game (REST)</button>
-            <button class="btn btn-secondary ms-1" @onclick="() => StartGame(true)">New Game (gRPC)</button>
+            <div class="ms-3 border-start ps-3">
+                <button class="btn btn-primary" @onclick="() => StartSinglePlayerGame(false)">New Game (REST)</button>
+                <button class="btn btn-secondary ms-1" @onclick="() => StartSinglePlayerGame(true)">New Game (gRPC)</button>
+            </div>
         </div>
-
-        @if (IsGameActive)
-        {
-            <button class="btn btn-warning ms-2" @onclick="UndoAsync">Undo Last Move</button>
-        }
-        
-        <span class="ms-3 fw-bold text-info">@GameClient.Message</span>
-    </div>
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-3 pt-3 border-top">
+            <input class="form-control w-auto" @bind="_playerName" placeholder="Your Name" />
+            <input class="form-control w-auto" @bind="_gameId" placeholder="Game ID" />
+            <button class="btn btn-info" @onclick="JoinMultiplayerGame">Create/Join Multiplayer Game</button>
+        </div>
+    }
+    
+    <span class="ms-3 fw-bold text-info">@_message</span>
 </div>
 
-@if (GameClient.CurrentGame != null)
+@if (CurrentGame != null)
 {
     <div class="container-fluid">
-        @if (IsSetupPhase)
+        @if (CurrentGame.State == GameState.Setup)
         {
             <div class="alert alert-info d-flex justify-content-between align-items-center">
-                <span>
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    @_setupMessage
-                </span>
-                <button class="btn btn-success btn-sm" @onclick="ConfirmPlacementAsync">
-                    Confirm Placement & Start
-                </button>
+                @if (CurrentGame.ShipsPlaced)
+                {
+                    <span><i class="bi bi-hourglass-split me-2"></i>Waiting for opponent to place their ships...</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-info-circle-fill me-2"></i>Place your ships. Drag to move, click to rotate.</span>
+                    <button class="btn btn-success btn-sm" @onclick="ConfirmPlacement">Confirm Placement</button>
+                }
             </div>
         }
 
         <div class="row g-4">
             <div class="col-md-6">
                 <h3 class="text-primary">Your Grid</h3>
-                
                 <GridBoard 
-                    PlayerGrid="@GameClient.CurrentGame.PlayerGrid"
-                    Ships="@(IsSetupPhase ? _setupShips : GameClient.CurrentGame.Ships)"
-                    IsDraggable="@IsSetupPhase"
+                    PlayerGrid="@CurrentGame.PlayerGrid"
+                    Ships="@(CurrentGame.State == GameState.Setup && !CurrentGame.ShipsPlaced ? _setupShips : CurrentGame.Ships)"
+                    IsDraggable="@(CurrentGame.State == GameState.Setup && !CurrentGame.ShipsPlaced)"
                     IsInteractive="@false"
                     OnDrop="@(args => OnDrop(args.Row, args.Col))"
                     OnDragStart="@OnDragStart"
@@ -73,237 +82,152 @@
             <div class="col-md-6">
                 <h3 class="text-danger">Opponent Grid</h3>
                 <GridBoard 
-                    OpponentGrid="@GameClient.CurrentGame.OpponentGrid"
-                    IsInteractive="@(!GameClient.CurrentGame.IsGameOver && !IsSetupPhase)"
-                    OnCellClick="@(args => AttackAsync(args.Row, args.Col))"
+                    OpponentGrid="@CurrentGame.OpponentGrid"
+                    IsInteractive="@(CurrentGame.State == GameState.Playing && CurrentGame.IsMyTurn)"
+                    OnCellClick="@(args => Attack(args.Row, args.Col))"
                 />
             </div>
         </div>
-
-        @if (GameClient.CurrentGame.History.Any())
-        {
-            <div class="row mt-5">
-                <div class="col-12">
-                    <h3>Battle Log</h3>
-                    <div class="history-container shadow-sm">
-                        <table class="table table-hover table-bordered mb-0">
-                            <thead class="table-dark sticky-top">
-                                <tr>
-                                    <th>Turn</th>
-                                    <th>Your Move</th>
-                                    <th>Result</th>
-                                    <th>Enemy Move</th>
-                                    <th>Enemy Result</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            @foreach (var move in ((IEnumerable<MoveHistory>)GameClient.CurrentGame.History).Reverse())
-                            {
-                                <tr @onclick="() => UndoToTurnAsync(move.Turn - 1)" 
-                                    class="cursor-pointer" 
-                                    title="Click to time travel to this turn">
-                                    <td>@move.Turn</td>
-                                    <td>@move.PlayerMove</td>
-                                    <td>@GetResultBadge(move.PlayerResult)</td>
-                                    <td>@move.AiMove</td>
-                                    <td>@GetResultBadge(move.AiResult)</td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        }
     </div>
 }
 
-<style>
-    /* CSS Variables for consistent sizing */
-    :root {
-        --cell-size: 35px;
-        --grid-border-color: #0a2fa8;
-        --grid-bg-color: #78a7f5;
-    }
-
-    .battleship-grid-container {
-        display: flex;
-        flex-direction: column;
-        border: 2px solid var(--grid-border-color);
-        width: fit-content;
-        position: relative; 
-        background-color: var(--grid-bg-color);
-        line-height: 0; 
-    }
-
-    .grid-row {
-        display: flex;
-        padding: 0;
-        margin: 0;
-    }
-
-    .grid-cell {
-        width: var(--cell-size);
-        height: var(--cell-size);
-        box-sizing: border-box; 
-        border: 1px solid rgba(17, 27, 120, 0.3); 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        margin: 0;
-    }
-
-    /* Utility Classes */
-    .cursor-grab { cursor: grab; }
-    .cursor-grab:active { cursor: grabbing; }
-    .cursor-crosshair { cursor: crosshair; }
-    .cursor-pointer { cursor: pointer; }
-    
-    .hover-effect:hover {
-        background-color: rgba(255, 255, 255, 0.3);
-    }
-
-    .history-container {
-        max-height: 300px; 
-        overflow-y: auto;
-    }
-</style>
-
 @code {
-    // -- CONSTANTS --
-    // Centralized size definition to avoid magic numbers
-    private const int CellSize = 35; 
-
-    // -- STATE --
+    private GameStatus? CurrentGame => _isMultiplayerGame ? _multiplayerGameStatus : GameClient.CurrentGame;
+    private GameStatus? _multiplayerGameStatus;
+    
+    // Single Player State
     private DifficultyLevel _selectedDifficulty = DifficultyLevel.Medium;
     private int _selectGridSize = 10;
+
+    // Multiplayer State
+    private HubConnection? _hubConnection;
+    private string? _gameId;
+    private string? _playerName = "Player";
+    private bool _isMultiplayerGame = false;
     
-    // Setup Phase State
+    // Shared State
+    private string? _message;
     private List<ShipInfo> _setupShips = new();
     private ShipInfo? _draggedShip;
-    private string? _setupMessage;
 
-    // -- COMPUTED PROPERTIES --
-    private bool IsGameActive => GameClient.CurrentGame != null && !GameClient.CurrentGame.IsGameOver;
-    private bool IsSetupPhase => GameClient.CurrentGame?.State == GameState.Setup;
-
-    // -- GAME LIFECYCLE METHODS --
-
-    private async Task StartGame(bool useGrpc)
+    private async Task StartSinglePlayerGame(bool useGrpc)
     {
-        await GameClient.StartGameAsync(useGrpc, _selectedDifficulty, _selectGridSize );
-        
-        if (IsSetupPhase)
+        _isMultiplayerGame = false;
+        await GameClient.StartGameAsync(useGrpc, _selectedDifficulty, _selectGridSize);
+        _message = GameClient.Message;
+        if (GameClient.CurrentGame?.State == GameState.Setup)
         {
-            // Deep clone ships for local manipulation (drag & drop) without affecting server state yet
-            _setupShips = GameClient.CurrentGame!.Ships.Select(s => new ShipInfo 
-            { 
-                Letter = s.Letter, 
-                Size = s.Size, 
-                Row = s.Row, 
-                Col = s.Col, 
-                IsHorizontal = s.IsHorizontal 
-            }).ToList();
-            
-            _setupMessage = "Drag and drop ships to reposition. Click a ship to rotate it.";
+            _setupShips = GameClient.CurrentGame.Ships.Select(s => new ShipInfo { Letter = s.Letter, Size = s.Size }).ToList();
         }
     }
 
-    private async Task ConfirmPlacementAsync()
+    private async Task JoinMultiplayerGame()
     {
-        if (GameClient.CurrentGame == null) return;
-        
-        await GameClient.PlaceShipsAsync(_setupShips);
-        
-        // Update message based on whether the server accepted the state
-        if (GameClient.CurrentGame.State == GameState.Playing)
+        if (string.IsNullOrWhiteSpace(_gameId) || string.IsNullOrWhiteSpace(_playerName))
         {
-            _setupMessage = null;
+            _message = "Please enter a player name and game ID.";
+            return;
         }
-        else
+
+        _isMultiplayerGame = true;
+        var backendUrl = Configuration["BackendUrl"] ?? "http://localhost:5200";
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri($"{backendUrl}/gamehub"))
+            .Build();
+
+        _hubConnection.On<GameStatus>("UpdateGameState", (gameStatus) =>
         {
-            _setupMessage = GameClient.Message; // Likely a validation error from server
+            _multiplayerGameStatus = gameStatus;
+            if (_multiplayerGameStatus.State == GameState.Setup && !_multiplayerGameStatus.ShipsPlaced)
+            {
+                // Only initialize draggable ships if they haven't been placed yet
+                if(!_setupShips.Any())
+                {
+                    _setupShips = _multiplayerGameStatus.Ships.Select(s => new ShipInfo { Letter = s.Letter, Size = s.Size }).ToList();
+                }
+            }
+            UpdateMessage();
+            StateHasChanged();
+        });
+        
+        _hubConnection.On<string>("Error", (errorMessage) =>
+        {
+            _message = errorMessage;
+            StateHasChanged();
+        });
+
+        _hubConnection.On("OpponentDisconnected", () => {
+            _message = "Your opponent has disconnected. The game is over.";
+            if (_multiplayerGameStatus != null)
+            {
+                _multiplayerGameStatus.IsGameOver = true;
+            }
+            StateHasChanged();
+        });
+
+        try
+        {
+            await _hubConnection.StartAsync();
+            await _hubConnection.SendAsync("CreateOrJoinGame", _gameId, _playerName, _selectGridSize);
+        }
+        catch (Exception ex)
+        {
+            _message = $"Error connecting to server: {ex.Message}";
         }
     }
 
-    private async Task AttackAsync(int row, int col)
+    private async Task ConfirmPlacement()
     {
-        if (GameClient.CurrentGame?.IsGameOver == true) return;
-        
-        // Prevent attacking during setup phase
-        if (IsSetupPhase) return;
-        
-        // Prevent attacking already targeted cells
-        if (GameClient.CurrentGame?.OpponentGrid[row][col] != null) return;
-
-        await GameClient.AttackAsync(row, col);
+        if (_hubConnection != null && _isMultiplayerGame)
+        {
+            await _hubConnection.SendAsync("PlaceShips", _setupShips);
+        }
     }
 
-    private async Task UndoAsync()
+    private async Task Attack(int row, int col)
     {
-        await GameClient.UndoAsync();
-    }
-    
-    private async Task UndoToTurnAsync(int turn)
-    {
-        await GameClient.UndoToTurnAsync(turn);
+        if (_hubConnection != null && _isMultiplayerGame)
+        {
+            await _hubConnection.SendAsync("Attack", row, col);
+        }
     }
 
-    // -- DRAG AND DROP & SHIP MANIPULATION --
-
-    private void OnDragStart(ShipInfo ship)
+    private void UpdateMessage()
     {
-        // Capture the ship being moved
-        _draggedShip = ship;
+        if (CurrentGame == null) return;
+        if (CurrentGame.IsGameOver)
+        {
+            _message = $"Game Over! Winner: {CurrentGame.Winner}";
+            return;
+        }
+        switch (CurrentGame.State)
+        {
+            case GameState.Setup:
+                 _message = CurrentGame.ShipsPlaced ? "Waiting for opponent..." : "Place your ships.";
+                break;
+            case GameState.Playing:
+                _message = CurrentGame.IsMyTurn ? "Your turn." : "Opponent's turn.";
+                break;
+        }
     }
 
+    private void OnDragStart(ShipInfo ship) => _draggedShip = ship;
+    private void RotateShip(ShipInfo ship) => ship.IsHorizontal = !ship.IsHorizontal;
     private void OnDrop(int row, int col)
     {
         if (_draggedShip == null) return;
-
-        // BOUNDARY VALIDATION:
-        // Ensure the ship doesn't visually "fall off" the grid.
-        // If horizontal, it spans columns. If vertical, it spans rows.
-        var limitRow = _selectGridSize;
-        var limitCol = _selectGridSize;
-
-        if (_draggedShip.IsHorizontal)
-        {
-            if (col + _draggedShip.Size > limitCol) return; // Out of bounds right
-        }
-        else
-        {
-            if (row + _draggedShip.Size > limitRow) return; // Out of bounds bottom
-        }
-
-        // Apply Position
+        var limit = _selectGridSize;
+        if ((_draggedShip.IsHorizontal && col + _draggedShip.Size > limit) || (!_draggedShip.IsHorizontal && row + _draggedShip.Size > limit)) return;
         _draggedShip.Row = row;
         _draggedShip.Col = col;
-        
         _draggedShip = null;
     }
 
-    private void RotateShip(ShipInfo ship)
+    public async ValueTask DisposeAsync()
     {
-        if (!IsSetupPhase) return;
-
-        // Toggle rotation
-        ship.IsHorizontal = !ship.IsHorizontal;
-        
-        // CORNER CASE: 
-        // If rotating causes the ship to go out of bounds, push it back in.
-        // (Optional simplified logic: just reset to horizontal if invalid, 
-        // or more complex logic to shift row/col).
-        // For now, we trust the visual user will drag it back if it clips.
-    }
-
-    // -- UI HELPERS --
-
-    private RenderFragment GetResultBadge(string result)
-    {
-        // Optional: Helper to colorize text results in history
-        var color = result.Contains("Hit") ? "text-danger fw-bold" : "text-muted";
-        return @<span class="@color">@result</span>;
+        if (_hubConnection is not null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
     }
 }

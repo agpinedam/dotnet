@@ -235,7 +235,7 @@ public class GameService : IGameService
     {
         return new GameStatus
         {
-            GameId = game.Id,
+            GameId = game.Id.ToString(),
             State = game.State,
             PlayerGrid = game.PlayerGrid,
             Ships = game.PlayerShips,

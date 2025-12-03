@@ -4,6 +4,7 @@ using BattleShip.Models;
 using BattleShip.Protos;
 using FluentValidation;
 using Microsoft.AspNetCore.Http.HttpResults;
+using BattleShip.API.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,7 @@ builder.Services.AddScoped<IValidator<AttackRequest>, AttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcAttackRequest>, GrpcAttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcUndoRequest>, GrpcUndoRequestValidator>();
 builder.Services.AddGrpc(); // Add gRPC services
+builder.Services.AddSignalR(); // Add SignalR
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -21,9 +23,10 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowAll",
         policy =>
         {
-            policy.AllowAnyOrigin()
+            policy.WithOrigins("http://localhost:5173") // Blazor app address
                    .AllowAnyMethod()
                    .AllowAnyHeader()
+                   .AllowCredentials() // Required for SignalR
                    .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding"); // Required for gRPC-Web
         });
 });
@@ -37,6 +40,7 @@ app.MapGet("/", () => "BattleShip API is running!");
 
 // Map gRPC Service
 app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
+app.MapHub<GameHub>("/gamehub"); // Map SignalR Hub
 
 app.MapPost("/game", Ok<GameStatus> (CreateGameRequest request, IGameService gameService) =>
 {
@@ -104,4 +108,3 @@ app.MapPost("/game/{id}/place-ships", Results<Ok<GameStatus>, BadRequest<string>
 });
 
 app.Run();
-

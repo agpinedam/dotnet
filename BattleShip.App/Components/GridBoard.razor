@@ -39,7 +39,7 @@
                 <div class="ship-container @(IsDraggable ? "cursor-grab" : "")"
                      draggable="@(IsDraggable ? "true" : "false")"
                      @ondragstart="() => OnDragStart.InvokeAsync(ship)"
-                     @onclick="() => OnRotate.InvokeAsync(ship)"
+                     @onclick="() => { if (IsDraggable) OnRotate.InvokeAsync(ship); }"
                      style="left: @(ship.Col * 100.0 / GridCols)%; 
                             top: @(ship.Row * 100.0 / GridRows)%;
                             width: @(widthPct.ToString(System.Globalization.CultureInfo.InvariantCulture))%;

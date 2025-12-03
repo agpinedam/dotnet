@@ -209,11 +209,13 @@
 
     private void OnDragStart(ShipInfo ship)
     {
+        if (!IsSetupPhase) return;
         _draggedShip = ship;
     }
 
     private void OnDrop(int row, int col)
     {
+        if (!IsSetupPhase) return;
         if (_draggedShip == null) return;
 
         if (IsValidPlacement(_draggedShip, row, col, _draggedShip.IsHorizontal))

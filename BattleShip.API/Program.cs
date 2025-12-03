@@ -54,7 +54,7 @@ app.MapPost("/game/{id}/attack", async Task<Results<Ok<GameStatus>, NotFound<str
 
     try
     {
-        var game = gameService.Attack(id, request.Row, request.Col);
+        var game = gameService.Attack(id, request.Row, request.Col, request.GridSize);
         return TypedResults.Ok(game);
     }
     catch (ArgumentException)

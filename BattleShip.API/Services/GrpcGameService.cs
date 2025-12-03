@@ -35,7 +35,7 @@ public class GrpcGameService : Game.GameBase
         try
         {
             var gameId = Guid.Parse(request.GameId);
-            var game = _gameService.Attack(gameId, request.Row, request.Col);
+            var game = _gameService.Attack(gameId, request.Row, request.Col,10);
             return MapToGrpc(game);
         }
         catch (ArgumentException)

@@ -52,14 +52,9 @@
 
                         const int cellSize = 35; 
                         
-                        // Positioning
                         var top = ship.Row * cellSize; 
                         var left = ship.Col * cellSize;
-                        
-                        // Fill ship size
                         var height = ship.Size * cellSize; 
-                        
-                        // Rotation logic
                         var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
 
                         <img src="/images/@shipImage" style="position: absolute; 
@@ -69,7 +64,6 @@
                                     height: @(height)px; 
                                     z-index: 1;
                                     pointer-events: none;
-                                    /* El punto de pivote debe ser exactamente el centro de la PRIMERA celda */
                                     transform-origin: 17.5px 17.5px;
                                     transform: @rotation;" alt=""/>
                     }

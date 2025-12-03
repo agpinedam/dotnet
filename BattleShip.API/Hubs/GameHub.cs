@@ -8,68 +8,6 @@ using BattleShip.Models;
 
 namespace BattleShip.API.Hubs
 {
-    // Represents a player in a multiplayer game
-    public class Player
-    {
-        public string ConnectionId { get; }
-        public string Name { get; }
-        public char[][] Grid { get; }
-        public List<ShipInfo> Ships { get; set; } = new List<ShipInfo>();
-        public bool ShipsPlaced { get; set; } = false;
-
-        public Player(string connectionId, string name, int gridSize)
-        {
-            ConnectionId = connectionId;
-            Name = name;
-            Grid = new char[gridSize][];
-            for (int i = 0; i < gridSize; i++)
-            {
-                Grid[i] = new char[gridSize];
-                for (int j = 0; j < gridSize; j++)
-                {
-                    Grid[i][j] = ' '; // Initialize with empty space
-                }
-            }
-        }
-    }
-
-    // Represents the state of a single multiplayer game
-    public class MultiplayerGame
-    {
-        public string GameId { get; }
-        public Player Player1 { get; }
-        public Player? Player2 { get; set; }
-        public Player CurrentTurnPlayer { get; set; }
-
-        public MultiplayerGame(string gameId, Player player1)
-        {
-            GameId = gameId;
-            Player1 = player1;
-            CurrentTurnPlayer = player1;
-        }
-
-        public GameState GetState()
-        {
-            if (Player2 == null || !Player1.ShipsPlaced || !Player2.ShipsPlaced)
-            {
-                return GameState.Setup;
-            }
-            // Simplified win condition
-            if (IsLoser(Player1)) return GameState.GameOver;
-            if (IsLoser(Player2)) return GameState.GameOver;
-            
-            return GameState.Playing;
-        }
-
-        public bool IsLoser(Player player)
-        {
-            // A player loses if all their ship cells have been hit
-            return player.Ships.All(ship => 
-                ship.Hits >= ship.Size
-            );
-        }
-    }
-
     public class GameHub : Hub
     {
         private static readonly ConcurrentDictionary<string, MultiplayerGame> _games = new ConcurrentDictionary<string, MultiplayerGame>();
@@ -148,21 +86,33 @@ namespace BattleShip.API.Hubs
                     return; // Not your turn or game not ready
                 }
 
+                var attacker = game.CurrentTurnPlayer;
                 var opponent = (game.Player1.ConnectionId == Context.ConnectionId) ? game.Player2 : game.Player1;
                 if (opponent == null) return;
 
                 char cell = opponent.Grid[row][col];
+                string result;
                 if (char.IsLetter(cell))
                 {
                     opponent.Grid[row][col] = 'X'; // Hit
                     var hitShip = opponent.Ships.FirstOrDefault(s => s.Letter == cell);
                     if(hitShip != null) hitShip.Hits++;
+                    result = "Hit";
                 }
-                else if (cell == ' ')
+                else 
                 {
                     opponent.Grid[row][col] = 'M'; // Miss
+                    result = "Miss";
                 }
                 
+                var move = new MoveHistory
+                {
+                    Turn = game.History.Count + 1,
+                    PlayerMove = $"{attacker.Name} attacked ({row},{col})",
+                    PlayerResult = result
+                };
+                game.History.Add(move);
+
                 // Switch turns
                 game.CurrentTurnPlayer = opponent;
                 await SendGameState(gameId);
@@ -206,6 +156,7 @@ namespace BattleShip.API.Hubs
                 PlayerGrid = me.Grid,
                 OpponentGrid = opponent != null ? MaskOpponentGrid(opponent.Grid) : CreateEmptyBoolGrid(gridSize),
                 Ships = me.Ships,
+                History = game.History,
                 IsMyTurn = game.CurrentTurnPlayer.ConnectionId == me.ConnectionId,
                 IsGameOver = game.GetState() == GameState.GameOver,
                 Winner = (game.GetState() == GameState.GameOver) ? (game.IsLoser(me) ? opponent?.Name : me.Name) : null,
@@ -242,9 +193,12 @@ namespace BattleShip.API.Hubs
         
         private List<ShipInfo> GetDefaultShips() => new List<ShipInfo>
         {
-            new() { Letter = 'A', Size = 5 }, new() { Letter = 'B', Size = 4 },
-            new() { Letter = 'C', Size = 3 }, new() { Letter = 'D', Size = 3 },
-            new() { Letter = 'E', Size = 2 }
+            new() { Letter = 'A', Size = 4 }, 
+            new() { Letter = 'B', Size = 3 }, 
+            new() { Letter = 'C', Size = 3 }, 
+            new() { Letter = 'D', Size = 2 }, 
+            new() { Letter = 'E', Size = 2 },
+            new() { Letter = 'F', Size = 1 }
         };
     }
 }

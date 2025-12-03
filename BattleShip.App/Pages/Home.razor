@@ -119,41 +119,6 @@
 }
 
 <style>
-    /* CSS Variables for consistent sizing */
-    :root {
-        --cell-size: 35px;
-        --grid-border-color: #0a2fa8;
-        --grid-bg-color: #78a7f5;
-    }
-
-    .battleship-grid-container {
-        display: flex;
-        flex-direction: column;
-        border: 2px solid var(--grid-border-color);
-        width: fit-content;
-        position: relative; 
-        background-color: var(--grid-bg-color);
-        line-height: 0; 
-    }
-
-    .grid-row {
-        display: flex;
-        padding: 0;
-        margin: 0;
-    }
-
-    .grid-cell {
-        width: var(--cell-size);
-        height: var(--cell-size);
-        box-sizing: border-box; 
-        border: 1px solid rgba(17, 27, 120, 0.3); 
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        margin: 0;
-    }
-
     /* Utility Classes */
     .cursor-grab { cursor: grab; }
     .cursor-grab:active { cursor: grabbing; }
@@ -171,10 +136,6 @@
 </style>
 
 @code {
-    // -- CONSTANTS --
-    // Centralized size definition to avoid magic numbers
-    private const int CellSize = 35; 
-
     // -- STATE --
     private DifficultyLevel _selectedDifficulty = DifficultyLevel.Medium;
     private int _selectGridSize = 10;
@@ -196,7 +157,6 @@
         
         if (IsSetupPhase)
         {
-            // Deep clone ships for local manipulation (drag & drop) without affecting server state yet
             _setupShips = GameClient.CurrentGame!.Ships.Select(s => new ShipInfo 
             { 
                 Letter = s.Letter, 
@@ -216,25 +176,20 @@
         
         await GameClient.PlaceShipsAsync(_setupShips);
         
-        // Update message based on whether the server accepted the state
         if (GameClient.CurrentGame.State == GameState.Playing)
         {
             _setupMessage = null;
         }
         else
         {
-            _setupMessage = GameClient.Message; // Likely a validation error from server
+            _setupMessage = GameClient.Message; 
         }
     }
 
     private async Task AttackAsync(int row, int col)
     {
         if (GameClient.CurrentGame?.IsGameOver == true) return;
-        
-        // Prevent attacking during setup phase
         if (IsSetupPhase) return;
-        
-        // Prevent attacking already targeted cells
         if (GameClient.CurrentGame?.OpponentGrid[row][col] != null) return;
 
         await GameClient.AttackAsync(row, col);
@@ -254,7 +209,6 @@
 
     private void OnDragStart(ShipInfo ship)
     {
-        // Capture the ship being moved
         _draggedShip = ship;
     }
 
@@ -262,24 +216,11 @@
     {
         if (_draggedShip == null) return;
 
-        // BOUNDARY VALIDATION:
-        // Ensure the ship doesn't visually "fall off" the grid.
-        // If horizontal, it spans columns. If vertical, it spans rows.
-        var limitRow = _selectGridSize;
-        var limitCol = _selectGridSize;
-
-        if (_draggedShip.IsHorizontal)
+        if (IsValidPlacement(_draggedShip, row, col, _draggedShip.IsHorizontal))
         {
-            if (col + _draggedShip.Size > limitCol) return; // Out of bounds right
+            _draggedShip.Row = row;
+            _draggedShip.Col = col;
         }
-        else
-        {
-            if (row + _draggedShip.Size > limitRow) return; // Out of bounds bottom
-        }
-
-        // Apply Position
-        _draggedShip.Row = row;
-        _draggedShip.Col = col;
         
         _draggedShip = null;
     }
@@ -287,22 +228,56 @@
     private void RotateShip(ShipInfo ship)
     {
         if (!IsSetupPhase) return;
-
-        // Toggle rotation
-        ship.IsHorizontal = !ship.IsHorizontal;
         
-        // CORNER CASE: 
-        // If rotating causes the ship to go out of bounds, push it back in.
-        // (Optional simplified logic: just reset to horizontal if invalid, 
-        // or more complex logic to shift row/col).
-        // For now, we trust the visual user will drag it back if it clips.
+        if (IsValidPlacement(ship, ship.Row, ship.Col, !ship.IsHorizontal))
+        {
+            ship.IsHorizontal = !ship.IsHorizontal;
+        }
     }
 
-    // -- UI HELPERS --
+    private bool IsValidPlacement(ShipInfo shipToPlace, int row, int col, bool isHorizontal)
+    {
+        var gridSize = GameClient.CurrentGame?.PlayerGrid?.Length ?? _selectGridSize;
+        
+        // 1. Check Boundaries
+        if (row < 0 || col < 0) return false;
+        if (isHorizontal)
+        {
+            if (col + shipToPlace.Size > gridSize) return false;
+            if (row >= gridSize) return false;
+        }
+        else
+        {
+            if (row + shipToPlace.Size > gridSize) return false;
+            if (col >= gridSize) return false;
+        }
+
+        // 2. Check Overlaps
+        foreach (var otherShip in _setupShips)
+        {
+            if (otherShip == shipToPlace) continue; 
+
+            // Check intersection
+            for (int i = 0; i < shipToPlace.Size; i++)
+            {
+                int r1 = isHorizontal ? row : row + i;
+                int c1 = isHorizontal ? col + i : col;
+
+                for (int j = 0; j < otherShip.Size; j++)
+                {
+                    int r2 = otherShip.IsHorizontal ? otherShip.Row : otherShip.Row + j;
+                    int c2 = otherShip.IsHorizontal ? otherShip.Col + j : otherShip.Col;
+
+                    if (r1 == r2 && c1 == c2) return false;
+                }
+            }
+        }
+
+        return true;
+    }
 
     private RenderFragment GetResultBadge(string result)
     {
-        // Optional: Helper to colorize text results in history
         var color = result.Contains("Hit") ? "text-danger fw-bold" : "text-muted";
         return @<span class="@color">@result</span>;
     }

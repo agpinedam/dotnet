@@ -1,67 +1,113 @@
 @using BattleShip.Models
 @using Microsoft.AspNetCore.Components.Web
 
-<div class="battleship-grid-container" style="@ContainerStyle">
-    @if (Ships != null)
-    {
-        foreach (var ship in Ships)
+<div class="battleship-responsive-wrapper" style="--grid-rows: @GridRows; --grid-cols: @GridCols;">
+    <div class="battleship-grid-container">
+        
+        @if (Ships != null)
         {
-             <img src="/images/@GetShipImage(ship.Size)" 
-                  draggable="@(IsDraggable ? "true" : "false")"
-                  @ondragstart="() => OnDragStart.InvokeAsync(ship)"
-                  @onclick="() => OnRotate.InvokeAsync(ship)"
-                  style="@GetShipStyle(ship)"
-                  class="ship-element @(IsDraggable ? "cursor-grab" : "")"
-                  alt="Ship" />
-        }
-    }
-
-    @for (int r = 0; r < GridRows; r++)
-    {
-        <div class="grid-row">
-            @for (int c = 0; c < GridCols; c++)
+            foreach (var ship in Ships)
             {
-                var row = r;
-                var col = c;
-                var cellState = GetCellState(row, col);
+                var isHorizontal = ship.IsHorizontal;
                 
-                <div class="grid-cell @(IsClickable(row, col) ? "cursor-crosshair hover-effect" : "")"
-                     style="width: @(CellSize)px; height: @(CellSize)px;"
-                     ondragover="event.preventDefault();"
-                     @ondrop="() => OnDrop.InvokeAsync((row, col))"
-                     @onclick="() => HandleClick(row, col)">
-                     
-                     @if (cellState == CellState.Hit)
-                     {
-                         <img src="/images/hit.png" alt="Hit" class="img-fluid marker-overlay" />
-                     }
-                     else if (cellState == CellState.Miss)
-                     {
-                         <img src="/images/miss.png" alt="Miss" class="img-fluid marker-overlay" />
-                     }
+                // Calculate container dimensions based on orientation
+                // If horizontal, the container spans 'Size' columns and 1 row.
+                // If vertical, the container spans 1 column and 'Size' rows.
+                var widthPct = (isHorizontal ? ship.Size : 1) * 100.0 / GridCols;
+                var heightPct = (isHorizontal ? 1 : ship.Size) * 100.0 / GridRows;
+                
+                // Calculate image styles
+                // The source images are vertical. If the ship is horizontal, we rotate the image inside the container.
+                string imgStyle;
+                if (isHorizontal)
+                {
+                    // Image needs to be rotated -90deg.
+                    // Its pre-rotation width should match the container's height (1 cell).
+                    // Its pre-rotation height should match the container's width (Size cells).
+                    // Relative to the container (which is Size x 1):
+                    // Width = 1/Size * 100%
+                    // Height = Size/1 * 100%
+                    var imgW = 100.0 / ship.Size;
+                    var imgH = ship.Size * 100.0;
+                    imgStyle = $"width: {imgW.ToString(System.Globalization.CultureInfo.InvariantCulture)}%; height: {imgH.ToString(System.Globalization.CultureInfo.InvariantCulture)}%; transform: rotate(-90deg);";
+                }
+                else
+                {
+                    imgStyle = "width: 100%; height: 100%;";
+                }
+
+                <div class="ship-container @(IsDraggable ? "cursor-grab" : "")"
+                     draggable="@(IsDraggable ? "true" : "false")"
+                     @ondragstart="() => OnDragStart.InvokeAsync(ship)"
+                     @onclick="() => OnRotate.InvokeAsync(ship)"
+                     style="left: @(ship.Col * 100.0 / GridCols)%; 
+                            top: @(ship.Row * 100.0 / GridRows)%;
+                            width: @(widthPct.ToString(System.Globalization.CultureInfo.InvariantCulture))%;
+                            height: @(heightPct.ToString(System.Globalization.CultureInfo.InvariantCulture))%;">
+                    
+                    <img src="/images/@GetShipImage(ship.Size)" alt="Ship" class="ship-image" style="@imgStyle" />
                 </div>
             }
-        </div>
-    }
+        }
+
+        @for (int r = 0; r < GridRows; r++)
+        {
+            <div class="grid-row">
+                @for (int c = 0; c < GridCols; c++)
+                {
+                    var row = r;
+                    var col = c;
+                    var cellState = GetCellState(row, col);
+
+                    <div class="grid-cell @(IsClickable(row, col) ? "cursor-crosshair hover-effect" : "")"
+                         ondragover="event.preventDefault();"
+                         @ondrop="() => OnDrop.InvokeAsync((row, col))"
+                         @onclick="() => HandleClick(row, col)">
+
+                        @if (cellState == CellState.Hit)
+                        {
+                            <img src="/images/hit.png" alt="Hit" style="position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; object-fit: contain;" />
+                        }
+                        else if (cellState == CellState.Miss)
+                        {
+                            <img src="/images/miss.png" alt="Miss" style="position: absolute; z-index: 20; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; object-fit: contain;" />
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
 </div>
 
 <style>
+    .battleship-responsive-wrapper {
+        width: 100%;
+        max-width: 600px; 
+        margin: 0 auto;
+        position: relative;
+    }
+
     .battleship-grid-container {
         display: flex;
         flex-direction: column;
-        position: relative; 
-        line-height: 0; 
+        position: relative;
+        width: 100%;
+        aspect-ratio: var(--grid-cols) / var(--grid-rows); 
+        background-color: #78a7f5;
+        border: 2px solid #0a2fa8;
+        box-sizing: border-box;
     }
 
     .grid-row {
         display: flex;
-        padding: 0;
-        margin: 0;
+        flex: 1;
+        width: 100%;
     }
 
     .grid-cell {
-        box-sizing: border-box; 
-        border: 1px solid rgba(17, 27, 120, 0.3); 
+        flex: 1;
+        position: relative;
+        border: 1px solid rgba(17, 27, 120, 0.3);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -69,6 +115,23 @@
         margin: 0;
     }
 
+    /* Style for ships */
+    .ship-container {
+        position: absolute;
+        z-index: 10;
+        display: flex; 
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .ship-image {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: fill; 
+    }
+
+    /* Utilidades */
     .cursor-grab { cursor: grab; }
     .cursor-grab:active { cursor: grabbing; }
     .cursor-crosshair { cursor: crosshair; }
@@ -76,18 +139,11 @@
     .hover-effect:hover {
         background-color: rgba(255, 255, 255, 0.3);
     }
-
-    .marker-overlay {
-        position: relative;
-        z-index: 20;
-        pointer-events: none;
-    }
 </style>
 
 @code {
     [Parameter] public int Rows { get; set; } = 10;
     [Parameter] public int Cols { get; set; } = 10;
-    [Parameter] public int CellSize { get; set; } = 35;
     
     // Data
     [Parameter] public char[][]? PlayerGrid { get; set; }
@@ -96,7 +152,7 @@
     
     // Behavior
     [Parameter] public bool IsDraggable { get; set; }
-    [Parameter] public bool IsInteractive { get; set; } // For attacks
+    [Parameter] public bool IsInteractive { get; set; }
     
     // Events
     [Parameter] public EventCallback<(int Row, int Col)> OnCellClick { get; set; }
@@ -106,8 +162,6 @@
 
     private int GridRows => PlayerGrid?.Length ?? OpponentGrid?.Length ?? Rows;
     private int GridCols => PlayerGrid?[0].Length ?? OpponentGrid?[0].Length ?? Cols;
-
-    private string ContainerStyle => $"width: {GridCols * CellSize}px; height: {GridRows * CellSize}px; background-color: #78a7f5; border: 2px solid #0a2fa8;";
 
     private enum CellState { Empty, Hit, Miss }
 
@@ -154,29 +208,7 @@
         1 => "ship1.png",
         _ => "ship1.png"
     };
-
-    private string GetShipStyle(ShipInfo ship)
-    {
-        var top = ship.Row * CellSize;
-        var left = ship.Col * CellSize;
-        var height = ship.Size * CellSize;
-        var width = CellSize; 
-        
-        // If horizontal, we rotate the vertical image -90 degrees
-        // Pivot is center of the top-left cell (which becomes left-most after rotation?)
-        // Wait, Home.razor used transform-origin: {pivot}px {pivot}px;
-        
-        var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
-        var pivot = CellSize / 2.0;
-
-        return $@"
-            position: absolute; 
-            top: {top}px; 
-            left: {left}px; 
-            width: {width}px; 
-            height: {height}px; 
-            z-index: 10; 
-            transform-origin: {pivot}px {pivot}px;
-            transform: {rotation};";
-    }
+    
+    // Nota: He movido la lógica de estilo GetShipStyle directamente al HTML 
+    // para facilitar la lectura de los cálculos porcentuales.
 }

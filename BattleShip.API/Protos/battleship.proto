@@ -8,6 +8,8 @@ service Game {
   rpc CreateGame (GrpcCreateGameRequest) returns (GrpcGameStatus);
   rpc Attack (GrpcAttackRequest) returns (GrpcGameStatus);
   rpc Undo (GrpcUndoRequest) returns (GrpcGameStatus);
+  rpc UndoToTurn (GrpcUndoToTurnRequest) returns (GrpcGameStatus);
+  rpc PlaceShips (GrpcPlaceShipsRequest) returns (GrpcGameStatus);
 }
 
 message GrpcCreateGameRequest {
@@ -25,6 +27,16 @@ message GrpcAttackRequest {
 
 message GrpcUndoRequest {
     string gameId = 1;
+}
+
+message GrpcUndoToTurnRequest {
+    string gameId = 1;
+    int32 turn = 2;
+}
+
+message GrpcPlaceShipsRequest {
+    string gameId = 1;
+    repeated GrpcShipInfo ships = 2;
 }
 
 message GrpcMoveHistory {
@@ -45,6 +57,7 @@ message GrpcGameStatus {
   string lastAiAttackResult = 7;
   repeated GrpcMoveHistory history = 8;
   repeated GrpcShipInfo ships = 9;
+  int32 state = 10;
 }
 
 message GrpcShipInfo {

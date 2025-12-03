@@ -61,6 +61,7 @@ public class GameClient
             Winner = string.IsNullOrEmpty(grpcGame.Winner) ? null : grpcGame.Winner,
             LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
             LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
+            State = (GameState)grpcGame.State,
             History = new List<MoveHistory>()
         };
 
@@ -125,8 +126,26 @@ public class GameClient
         {
             if (_useGrpc)
             {
-                Message = "Place Ships not supported in gRPC yet.";
-                // TODO: Implement gRPC PlaceShips
+                var grpcRequest = new GrpcPlaceShipsRequest
+                {
+                    GameId = CurrentGame.GameId.ToString()
+                };
+
+                foreach (var s in ships)
+                {
+                    grpcRequest.Ships.Add(new GrpcShipInfo
+                    {
+                        Letter = s.Letter.ToString(),
+                        Size = s.Size,
+                        Row = s.Row,
+                        Col = s.Col,
+                        IsHorizontal = s.IsHorizontal
+                    });
+                }
+
+                var grpcGame = await _grpcClient.PlaceShipsAsync(grpcRequest);
+                CurrentGame = MapFromGrpc(grpcGame);
+                Message = "Ships placed! Battle starts (gRPC).";
             }
             else
             {
@@ -247,11 +266,9 @@ public class GameClient
         {
             if (_useGrpc)
             {
-                // Fallback for gRPC: Loop Undo until we reach the target turn
-                while (CurrentGame != null && CurrentGame.History.Count > turn)
-                {
-                    await UndoAsync();
-                }
+                var request = new GrpcUndoToTurnRequest { GameId = CurrentGame.GameId.ToString(), Turn = turn };
+                var grpcGame = await _grpcClient.UndoToTurnAsync(request);
+                CurrentGame = MapFromGrpc(grpcGame);
             }
             else
             {

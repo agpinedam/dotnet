@@ -21,6 +21,11 @@ public class GrpcGameService : Game.GameBase
     {
         var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
         int size = request.GridSize > 0 ? request.GridSize : 10;
+        // Validar rango de tamaño de grilla
+        if (size < 5 || size > 20)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Grid size must be between 5 and 20."));
+        }
         var game = _gameService.CreateGame(difficulty, size);
         return Task.FromResult(MapToGrpc(game));
     }
@@ -65,6 +70,46 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
+    public override Task<GrpcGameStatus> UndoToTurn(GrpcUndoToTurnRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var gameId = Guid.Parse(request.GameId);
+            var game = _gameService.UndoToTurn(gameId, request.Turn);
+            return Task.FromResult(MapToGrpc(game));
+        }
+        catch (ArgumentException)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Game not found"));
+        }
+    }
+
+    public override Task<GrpcGameStatus> PlaceShips(GrpcPlaceShipsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var gameId = Guid.Parse(request.GameId);
+            var ships = request.Ships.Select(s => new BattleShip.Models.ShipInfo
+            {
+                Letter = s.Letter.FirstOrDefault(),
+                Size = s.Size,
+                Row = s.Row,
+                Col = s.Col,
+                IsHorizontal = s.IsHorizontal
+            }).ToList();
+
+            var game = _gameService.PlaceShips(gameId, ships);
+            return Task.FromResult(MapToGrpc(game));
+        }
+        catch (ArgumentException ex)
+        {
+             if (ex.Message.Contains("not found"))
+                throw new RpcException(new Status(StatusCode.NotFound, ex.Message));
+             else
+                throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+    }
+
     private GrpcGameStatus MapToGrpc(BattleShip.Models.GameStatus game)
     {
         var grpcGame = new GrpcGameStatus
@@ -73,7 +118,8 @@ public class GrpcGameService : Game.GameBase
             Winner = game.Winner ?? "",
             IsGameOver = game.IsGameOver,
             LastAttackResult = game.LastAttackResult ?? "",
-            LastAiAttackResult = game.LastAiAttackResult ?? ""
+            LastAiAttackResult = game.LastAiAttackResult ?? "",
+            State = (int)game.State
         };
 
         // Map Player Grid (char[][]) to repeated string

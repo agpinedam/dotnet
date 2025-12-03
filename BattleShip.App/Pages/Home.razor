@@ -1,7 +1,22 @@
 ﻿@page "/"
 
-<PageTitle>BattleShip</PageTitle>
+<PageTitle>Welcome to BattleShip!</PageTitle>
 
-<h1>Welcome to BattleShip!</h1>
+<div class="text-center">
+    <h1 class="display-4">BattleShip</h1>
+    <p class="lead">A classic naval combat game built with Blazor.</p>
+    
+    <hr class="my-4" />
 
-<p>Choose a game mode from the navigation menu to get started.</p>
+    <p>Choose your battle:</p>
+    <div class="d-grid gap-2 col-6 mx-auto">
+        <a href="/singleplayer" class="btn btn-primary btn-lg">
+            <i class="bi bi-person-fill me-2"></i>
+            Play Against AI
+        </a>
+        <a href="/multiplayer" class="btn btn-info btn-lg">
+            <i class="bi bi-people-fill me-2"></i>
+            Play Against a Friend
+        </a>
+    </div>
+</div>

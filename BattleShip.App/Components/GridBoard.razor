@@ -33,11 +33,11 @@
                      
                      @if (cellState == CellState.Hit)
                      {
-                         <img src="/images/hit.png" alt="Hit" class="img-fluid" />
+                         <img src="/images/hit.png" alt="Hit" class="img-fluid marker-overlay" />
                      }
                      else if (cellState == CellState.Miss)
                      {
-                         <img src="/images/miss.png" alt="Miss" class="img-fluid" />
+                         <img src="/images/miss.png" alt="Miss" class="img-fluid marker-overlay" />
                      }
                 </div>
             }
@@ -75,6 +75,12 @@
     
     .hover-effect:hover {
         background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .marker-overlay {
+        position: relative;
+        z-index: 20;
+        pointer-events: none;
     }
 </style>
 

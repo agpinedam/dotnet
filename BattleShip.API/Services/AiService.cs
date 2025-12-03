@@ -4,15 +4,15 @@ namespace BattleShip.API.Services;
 
 public class AiService : IAiService
 {
-    public Queue<(int, int)> GenerateAiMoves()
+    public Queue<(int, int)> GenerateAiMoves(int gridSize)
     {
         var aiMoves = new Queue<(int, int)>();
         var evenMoves = new List<(int, int)>();
         var oddMoves = new List<(int, int)>();
 
-        for (int r = 0; r < 10; r++)
+        for (int r = 0; r < gridSize; r++)
         {
-            for (int c = 0; c < 10; c++)
+            for (int c = 0; c < gridSize; c++)
             {
                 if ((r + c) % 2 == 0)
                 {
@@ -47,6 +47,7 @@ public class AiService : IAiService
     {
         int aiRow = -1, aiCol = -1;
         bool foundMove = false;
+        int gridSize = game.PlayerGrid.Length; // Detect grid size dynamically
 
         // 1. Priority: Check Target Stack (Hunt Mode) - Only for Medium and Hard
         if (game.Difficulty != DifficultyLevel.Easy)
@@ -98,8 +99,8 @@ public class AiService : IAiService
                 while (!foundMove && attempts < 1000)
                 {
                     attempts++;
-                    int r = Random.Shared.Next(10);
-                    int c = Random.Shared.Next(10);
+                    int r = Random.Shared.Next(gridSize);
+                    int c = Random.Shared.Next(gridSize);
                     if (IsValidAttack(game.PlayerGrid, r, c))
                     {
                         aiRow = r;
@@ -111,9 +112,9 @@ public class AiService : IAiService
                 // Last resort: linear scan
                 if (!foundMove)
                 {
-                    for (int r = 0; r < 10; r++)
+                    for (int r = 0; r < gridSize; r++)
                     {
-                        for (int c = 0; c < 10; c++)
+                        for (int c = 0; c < gridSize; c++)
                         {
                             if (IsValidAttack(game.PlayerGrid, r, c))
                             {
@@ -206,16 +207,18 @@ public class AiService : IAiService
 
     private bool IsValidAttack(char[][] grid, int r, int c)
     {
-        if (r < 0 || r >= 10 || c < 0 || c >= 10) return false;
+        int gridSize = grid.Length;
+        if (r < 0 || r >= gridSize || c < 0 || c >= gridSize) return false;
         char cell = grid[r][c];
         return cell != 'X' && cell != 'O';
     }
 
     private bool IsShipSunk(char[][] grid, char letter)
     {
-        for (int r = 0; r < 10; r++)
+        int gridSize = grid.Length;
+        for (int r = 0; r < gridSize; r++)
         {
-            for (int c = 0; c < 10; c++)
+            for (int c = 0; c < gridSize; c++)
             {
                 if (grid[r][c] == letter) return false;
             }
@@ -289,6 +292,7 @@ public class AiService : IAiService
 
     private bool CanFitShip(char[][] grid, int r, int c, int minSize, bool horizontal)
     {
+        int gridSize = grid.Length;
         int count = 0;
         if (horizontal)
         {
@@ -299,7 +303,7 @@ public class AiService : IAiService
                 count++;
             }
             // Count right (excluding r,c)
-            for (int col = c + 1; col < 10; col++)
+            for (int col = c + 1; col < gridSize; col++)
             {
                 if (grid[r][col] == 'O') break;
                 count++;
@@ -314,7 +318,7 @@ public class AiService : IAiService
                 count++;
             }
             // Count down (excluding r,c)
-            for (int row = r + 1; row < 10; row++)
+            for (int row = r + 1; row < gridSize; row++)
             {
                 if (grid[row][c] == 'O') break;
                 count++;
@@ -358,15 +362,16 @@ public class AiService : IAiService
 
     private (int Row, int Col)? GetBestHeatmapMove(InternalGame game, bool useParity)
     {
-        int[][] heatmap = new int[10][];
-        for (int i = 0; i < 10; i++) heatmap[i] = new int[10];
+        int gridSize = game.PlayerGrid.Length;
+        int[][] heatmap = new int[gridSize][];
+        for (int i = 0; i < gridSize; i++) heatmap[i] = new int[gridSize];
 
         // Calculate probability for each remaining ship
         foreach (var shipSize in game.AlivePlayerShips)
         {
-            for (int r = 0; r < 10; r++)
+            for (int r = 0; r < gridSize; r++)
             {
-                for (int c = 0; c < 10; c++)
+                for (int c = 0; c < gridSize; c++)
                 {
                     // Check Horizontal
                     if (CanPlaceShip(game.PlayerGrid, r, c, shipSize, true))
@@ -386,9 +391,9 @@ public class AiService : IAiService
         // If smallest ship is 1, parity doesn't help (we must check every cell)
         if (useParity && game.AlivePlayerShips.Count > 0 && game.AlivePlayerShips.Min() > 1)
         {
-            for (int r = 0; r < 10; r++)
+            for (int r = 0; r < gridSize; r++)
             {
-                for (int c = 0; c < 10; c++)
+                for (int c = 0; c < gridSize; c++)
                 {
                     if ((r + c) % 2 != 0)
                     {
@@ -402,9 +407,9 @@ public class AiService : IAiService
         int maxScore = -1;
         var bestMoves = new List<(int, int)>();
 
-        for (int r = 0; r < 10; r++)
+        for (int r = 0; r < gridSize; r++)
         {
-            for (int c = 0; c < 10; c++)
+            for (int c = 0; c < gridSize; c++)
             {
                 if (IsValidAttack(game.PlayerGrid, r, c))
                 {
@@ -434,9 +439,10 @@ public class AiService : IAiService
 
     private bool CanPlaceShip(char[][] grid, int r, int c, int size, bool horizontal)
     {
+        int gridSize = grid.Length;
         if (horizontal)
         {
-            if (c + size > 10) return false;
+            if (c + size > gridSize) return false;
             for (int k = 0; k < size; k++)
             {
                 char cell = grid[r][c + k];
@@ -447,7 +453,7 @@ public class AiService : IAiService
         }
         else
         {
-            if (r + size > 10) return false;
+            if (r + size > gridSize) return false;
             for (int k = 0; k < size; k++)
             {
                 char cell = grid[r + k][c];

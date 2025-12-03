@@ -54,7 +54,7 @@ app.MapPost("/game/{id}/attack", async Task<Results<Ok<GameStatus>, NotFound<str
 
     try
     {
-        var game = gameService.Attack(id, request.Row, request.Col, request.GridSize);
+        var game = gameService.Attack(id, request.Row, request.Col);
         return TypedResults.Ok(game);
     }
     catch (ArgumentException)
@@ -86,6 +86,20 @@ app.MapPost("/game/{id}/undo-to-turn/{turn}", Results<Ok<GameStatus>, NotFound<s
     catch (ArgumentException)
     {
         return TypedResults.NotFound("Game not found");
+    }
+});
+
+app.MapPost("/game/{id}/place-ships", Results<Ok<GameStatus>, BadRequest<string>> (Guid id, PlaceShipsRequest request, IGameService gameService) =>
+{
+    if (id != request.GameId) return TypedResults.BadRequest("Game ID mismatch");
+    try
+    {
+        var status = gameService.PlaceShips(id, request.Ships);
+        return TypedResults.Ok(status);
+    }
+    catch (ArgumentException ex)
+    {
+        return TypedResults.BadRequest(ex.Message);
     }
 });
 

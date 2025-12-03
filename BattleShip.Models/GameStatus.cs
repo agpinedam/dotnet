@@ -11,6 +11,11 @@ public class GameStatus
     public Guid GameId { get; set; }
 
     /// <summary>
+    /// The current state of the game (Setup, Playing, GameOver).
+    /// </summary>
+    public GameState State { get; set; }
+
+    /// <summary>
     /// The player's grid.
     /// Represents the placement of ships and opponent's hits.
     /// Typically characters like 'S' for Ship, 'X' for Hit, 'M' for Miss, etc.

@@ -27,7 +27,7 @@ public class GameClient
         {
             if (useGrpc)
             {
-                var request = new GrpcCreateGameRequest { Difficulty = (int)difficulty };
+                var request = new GrpcCreateGameRequest { Difficulty = (int)difficulty, GridSize = gridSize };
                 var grpcGame = await _grpcClient.CreateGameAsync(request);
                 CurrentGame = MapFromGrpc(grpcGame);
                 Message = $"Game Started (via gRPC, {difficulty})! Good luck.";
@@ -115,6 +115,39 @@ public class GameClient
         }
 
         return game;
+    }
+
+    public async Task PlaceShipsAsync(List<ShipInfo> ships)
+    {
+        if (CurrentGame == null) return;
+
+        try
+        {
+            if (_useGrpc)
+            {
+                Message = "Place Ships not supported in gRPC yet.";
+                // TODO: Implement gRPC PlaceShips
+            }
+            else
+            {
+                var request = new PlaceShipsRequest { GameId = CurrentGame.GameId, Ships = ships };
+                var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/place-ships", request);
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
+                    Message = "Ships placed! Battle starts.";
+                }
+                else
+                {
+                    Message = "Failed to place ships. Check for overlaps.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Message = $"Error: {ex.Message}";
+        }
     }
 
     public async Task AttackAsync(int row, int col)

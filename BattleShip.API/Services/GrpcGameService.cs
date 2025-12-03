@@ -20,7 +20,8 @@ public class GrpcGameService : Game.GameBase
     public override Task<GrpcGameStatus> CreateGame(GrpcCreateGameRequest request, ServerCallContext context)
     {
         var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
-        var game = _gameService.CreateGame(difficulty, 10);
+        int size = request.GridSize > 0 ? request.GridSize : 10;
+        var game = _gameService.CreateGame(difficulty, size);
         return Task.FromResult(MapToGrpc(game));
     }
 
@@ -35,7 +36,7 @@ public class GrpcGameService : Game.GameBase
         try
         {
             var gameId = Guid.Parse(request.GameId);
-            var game = _gameService.Attack(gameId, request.Row, request.Col,10);
+            var game = _gameService.Attack(gameId, request.Row, request.Col);
             return MapToGrpc(game);
         }
         catch (ArgumentException)

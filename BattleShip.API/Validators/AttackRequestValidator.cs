@@ -8,9 +8,12 @@ public class AttackRequestValidator : AbstractValidator<AttackRequest>
     public AttackRequestValidator()
     {
         RuleFor(x => x.Row)
-            .InclusiveBetween(0, 9).WithMessage("Row must be between 0 and 9.");
+            .GreaterThanOrEqualTo(0).WithMessage("Row must be positive.");
 
         RuleFor(x => x.Col)
-            .InclusiveBetween(0, 9).WithMessage("Column must be between 0 and 9.");
+            .GreaterThanOrEqualTo(0).WithMessage("Column must be positive.");
+            
+        // We cannot validate upper bounds here easily without knowing the game's grid size.
+        // The service layer will handle OutOfBounds checks.
     }
 }

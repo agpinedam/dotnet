@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using BattleShip.API.Services;
 using BattleShip.Models;
 
 namespace BattleShip.API.Services;
@@ -5,8 +7,18 @@ namespace BattleShip.API.Services;
 public class GameService : IGameService
 {
     private readonly IAiService _aiService;
-    // In-memory storage for the game states (including the secret AI grid)
-    private static readonly Dictionary<Guid, InternalGame> Games = new();
+    private const char CellHit = 'X';
+    private const char CellMiss = 'O';
+    private const char CellWater = '\0'; 
+
+    // Thread-safe storage for game states. 
+    private static readonly ConcurrentDictionary<Guid, InternalGame> Games = new();
+
+    // Ship configuration: Letter and Size
+    private static readonly List<(char Letter, int Size)> ShipConfig = new()
+    {
+        ('A', 4), ('B', 3), ('C', 3), ('D', 2), ('E', 2), ('F', 1)
+    };
 
     public GameService(IAiService aiService)
     {
@@ -17,200 +29,214 @@ public class GameService : IGameService
     {
         var gameId = Guid.NewGuid();
 
-        // Generate Player Grid
-        var (playerGrid, playerShips) = GenerateGrid(gridSize);
+        // 1. Generate Grids
+        var (playerGrid, playerShips) = GenerateRandomGrid(gridSize);
+        var (aiGrid, _) = GenerateRandomGrid(gridSize);
 
-        // Generate AI Grid (Secret)
-        var (aiGrid, _) = GenerateGrid(gridSize);
+        // 2. Prepare AI Strategy
+        var aiMoves = _aiService.GenerateAiMoves(gridSize);
 
-        // Generate AI Moves Queue (Parity-based Strategy)
-        var aiMoves = _aiService.GenerateAiMoves();
-
+        // 3. Initialize Game State
         var game = new InternalGame
         {
             Id = gameId,
+            State = GameState.Setup,
             Difficulty = difficulty,
             PlayerGrid = playerGrid,
             PlayerShips = playerShips,
             AiGrid = aiGrid,
             AiMoves = aiMoves,
-            OpponentGrid = InitEmptyBoolGrid(gridSize),
-            AlivePlayerShips = new List<int> { 4, 3, 3, 2, 2, 1 }
+            OpponentGrid = InitFogOfWarGrid(gridSize),
+            // Track alive ships for game logic optimization
+            AlivePlayerShips = ShipConfig.Select(s => s.Size).ToList() 
         };
 
-        Games[gameId] = game;
+        // Thread-safe addition
+        Games.TryAdd(gameId, game);
 
-        return new GameStatus
-        {
-            GameId = gameId,
-            PlayerGrid = playerGrid,
-            Ships = playerShips,
-            OpponentGrid = game.OpponentGrid
-        };
+        return MapToStatus(game);
     }
 
-    public GameStatus Attack(Guid gameId, int row, int col, int gridSize)
+    public GameStatus PlaceShips(Guid gameId, List<ShipInfo> ships)
     {
-        if (!Games.TryGetValue(gameId, out var game))
-        {
-            throw new ArgumentException("Game not found");
-        }
+        var game = GetGameOrThrow(gameId);
 
-        if (game.Winner != null)
+        // Use a lock to prevent race conditions if user double-clicks confirm
+        lock (game)
         {
-            return GetGameStatus(game);
-        }
+            int gridSize = game.PlayerGrid.Length;
+            var newGrid = CreateEmptyGrid<char>(gridSize);
 
-        // Save state for Undo
-        game.PreviousStates.Push(game.DeepCopy());
-
-        var currentTurn = new MoveHistory
-        {
-            Turn = game.History.Count + 1,
-            PlayerMove = GetCoordinateString(row, col)
-        };
-
-        // Player Attack
-        string attackResult;
-        if (row >= 0 && row < gridSize && col >= 0 && col < gridSize)
-        {
-            char target = game.AiGrid[row][col];
-            
-            if (target == 'X' || target == 'O')
+            // Validation and Placement Phase
+            foreach (var ship in ships)
             {
-                attackResult = "Already fired here!";
-            }
-            else if (target != '\0') // It's a ship (A-F)
-            {
-                game.AiGrid[row][col] = 'X'; // Mark as Hit on internal grid
-                game.OpponentGrid[row][col] = true; // Update player's view
-                attackResult = "Hit!";
-            }
-            else // It's water
-            {
-                game.AiGrid[row][col] = 'O'; // Mark as Miss on internal grid
-                game.OpponentGrid[row][col] = false; // Update player's view
-                attackResult = "Miss";
-            }
-        }
-        else
-        {
-            attackResult = "Out of bounds";
-        }
+                ValidateShipBounds(ship, gridSize);
 
-        game.LastAttackResult = attackResult;
-        currentTurn.PlayerResult = attackResult;
+                if (!CanPlaceShip(newGrid, ship.Row, ship.Col, ship.Size, ship.IsHorizontal))
+                {
+                    throw new ArgumentException($"Invalid placement for ship {ship.Letter}. It overlaps with another ship.");
+                }
 
-        // Check Player Win
-        if (CheckWin(game.AiGrid))
+                PlaceShipOnGrid(newGrid, ship.Row, ship.Col, ship.Size, ship.IsHorizontal, ship.Letter);
+            }
+
+            // Commit State
+            game.PlayerGrid = newGrid;
+            game.PlayerShips = ships;
+            game.State = GameState.Playing;
+
+            return MapToStatus(game);
+        }
+    }
+
+    public GameStatus Attack(Guid gameId, int row, int col)
+    {
+        var game = GetGameOrThrow(gameId);
+
+        lock (game)
         {
-            game.Winner = "Player";
+            if (game.Winner != null) return MapToStatus(game);
+
+            // 1. Save State for Undo 
+            game.PreviousStates.Push(game.DeepCopy());
+
+            int gridSize = game.PlayerGrid.Length;
+            var currentTurn = new MoveHistory
+            {
+                Turn = game.History.Count + 1,
+                PlayerMove = GetCoordinateString(row, col)
+            };
+
+            // 2. Player Attack Logic
+            string attackResult = game.ProcessPlayerAttack(row, col);
+            currentTurn.PlayerResult = attackResult;
+
+            // Check Player Win
+            if (game.CheckWin(game.AiGrid))
+            {
+                game.Winner = "Player";
+                game.State = GameState.GameOver;
+                game.History.Add(currentTurn);
+                return MapToStatus(game);
+            }
+
+            // 3. AI Attack Logic
+            var aiTurnResult = _aiService.PerformAiTurn(game);
+            currentTurn.AiMove = aiTurnResult.Move ?? "";
+            currentTurn.AiResult = aiTurnResult.Result ?? "";
+
             game.History.Add(currentTurn);
-            return GetGameStatus(game);
-        }
-
-        // AI Turn
-        var (aiMove, aiResult) = _aiService.PerformAiTurn(game);
-        
-        if (aiMove != null)
-        {
-            currentTurn.AiMove = aiMove;
-            currentTurn.AiResult = aiResult ?? string.Empty;
-            game.LastAiAttackResult = $"AI attacked {aiMove}: {aiResult}";
 
             // Check AI Win
-            if (CheckWin(game.PlayerGrid))
+            if (game.CheckWin(game.PlayerGrid))
             {
                 game.Winner = "AI";
+                game.State = GameState.GameOver;
             }
+
+            return MapToStatus(game);
         }
-        
-        game.History.Add(currentTurn);
-
-        return GetGameStatus(game);
     }
-
 
     public GameStatus Undo(Guid gameId)
     {
-        if (!Games.TryGetValue(gameId, out var game))
-        {
-            throw new ArgumentException("Game not found");
-        }
+        var game = GetGameOrThrow(gameId);
 
-        if (game.PreviousStates.Count > 0)
+        lock (game)
         {
-            var previousState = game.PreviousStates.Pop();
-            
-            previousState.PreviousStates = game.PreviousStates;
-            
-            // 4. Update the dictionary
-            Games[gameId] = previousState;
-            
-            return GetGameStatus(previousState);
+            if (game.PreviousStates.Count > 0)
+            {
+                var previousState = game.PreviousStates.Pop();
+                
+                previousState.PreviousStates = game.PreviousStates; 
+                
+                // Update the thread-safe dictionary
+                Games[gameId] = previousState;
+                
+                return MapToStatus(previousState);
+            }
+            return MapToStatus(game);
         }
-
-        return GetGameStatus(game);
     }
 
-    public GameStatus UndoToTurn(Guid gameId, int turn)
+    public GameStatus UndoToTurn(Guid gameId, int targetTurn)
+    {
+        var game = GetGameOrThrow(gameId);
+
+        lock (game)
+        {
+            int currentTurnIndex = game.History.Count;
+            int stepsToUndo = currentTurnIndex - targetTurn;
+
+            if (stepsToUndo <= 0) return MapToStatus(game);
+
+            InternalGame restoredGame = game;
+
+            // Pop N times from the stack
+            for (int i = 0; i < stepsToUndo; i++)
+            {
+                if (restoredGame.PreviousStates.Count == 0) break;
+
+                var stack = restoredGame.PreviousStates;
+                restoredGame = stack.Pop();
+                restoredGame.PreviousStates = stack;
+            }
+
+            Games[gameId] = restoredGame;
+            return MapToStatus(restoredGame);
+        }
+    }
+
+    private InternalGame GetGameOrThrow(Guid gameId)
     {
         if (!Games.TryGetValue(gameId, out var game))
         {
             throw new ArgumentException("Game not found");
         }
-
-        int currentTurn = game.History.Count;
-        int stepsToUndo = currentTurn - turn;
-
-        if (stepsToUndo <= 0)
-        {
-            return GetGameStatus(game);
-        }
-
-        InternalGame targetState = game;
-        
-        for (int i = 0; i < stepsToUndo; i++)
-        {
-            if (targetState.PreviousStates.Count > 0)
-            {
-                var tempStack = targetState.PreviousStates; // The stack to continue popping from
-                targetState = tempStack.Pop();
-                targetState.PreviousStates = tempStack; // Restore the stack reference
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        Games[gameId] = targetState;
-        return GetGameStatus(targetState);
+        return game;
     }
 
-    private bool CheckWin(char[][] grid, int gridSize = 10)
+    private (string ResultDescription, bool IsHit) ProcessPlayerShot(InternalGame game, int row, int col)
     {
-        // Check if any ship parts (A-F) remain.
-        // If we find any character that is NOT '\0', 'X', or 'O', it means a ship is still alive.
-        for (int r = 0; r < gridSize; r++)
+        int gridSize = game.AiGrid.Length;
+
+        // Validation
+        if (row < 0 || row >= gridSize || col < 0 || col >= gridSize)
         {
-            for (int c = 0; c < gridSize; c++)
-            {
-                char cell = grid[r][c];
-                if (cell != '\0' && cell != 'X' && cell != 'O')
-                {
-                    return false; // Found a ship part
-                }
-            }
+            return ("Out of bounds", false);
         }
-        return true; // No ship parts found
+
+        char currentCell = game.AiGrid[row][col];
+
+        // Check if already fired
+        if (currentCell == CellHit || currentCell == CellMiss)
+        {
+            return ("Already fired here!", false);
+        }
+
+        // Logic: Hit or Miss
+        if (currentCell != CellWater) 
+        {
+            // It is a ship
+            game.AiGrid[row][col] = CellHit;
+            game.OpponentGrid[row][col] = true; // True = Hit
+            return ("Hit!", true);
+        }
+        else
+        {
+            // It is water
+            game.AiGrid[row][col] = CellMiss;
+            game.OpponentGrid[row][col] = false; // False = Miss
+            return ("Miss", false);
+        }
     }
 
-    private GameStatus GetGameStatus(InternalGame game)
+    private GameStatus MapToStatus(InternalGame game)
     {
         return new GameStatus
         {
             GameId = game.Id,
+            State = game.State,
             PlayerGrid = game.PlayerGrid,
             Ships = game.PlayerShips,
             OpponentGrid = game.OpponentGrid,
@@ -221,48 +247,16 @@ public class GameService : IGameService
         };
     }
 
-    private bool?[][] InitEmptyBoolGrid(int gridSize )
-    {
-        var grid = new bool?[gridSize][];
-        for (int i = 0; i < gridSize; i++)
-        {
-            grid[i] = new bool?[gridSize];
-        }
-        return grid;
-    }
+    // -- GRID GENERATION & MANIPULATION --
 
-    private string GetCoordinateString(int row, int col)
+    private (char[][] Grid, List<ShipInfo> Ships) GenerateRandomGrid(int gridSize)
     {
-        return $"{(char)('A' + row)}{col + 1}";
-    }
-
-    private (char[][] Grid, List<ShipInfo> Ships) GenerateGrid(int gridSize)
-    {
-        // Initialize jagged array
-        var grid = new char[gridSize][];
-        for (int i = 0; i < gridSize; i++)
-        {
-            grid[i] = new char[gridSize];
-            
-        }
-
+        var grid = CreateEmptyGrid<char>(gridSize);
         var placedShips = new List<ShipInfo>();
 
-        // Define ships: Letter and Size
-        // Requirement: Ships A-F, Sizes 1-4
-        var ships = new (char Letter, int Size)[]
+        foreach (var (letter, size) in ShipConfig)
         {
-            ('A', 4),
-            ('B', 3),
-            ('C', 3),
-            ('D', 2),
-            ('E', 2),
-            ('F', 1)
-        };
-
-        foreach (var ship in ships)
-        {
-            var info = PlaceShip(grid, ship.Letter, ship.Size);
+            var info = TryPlaceRandomShip(grid, letter, size, gridSize);
             if (info != null)
             {
                 placedShips.Add(info);
@@ -272,38 +266,24 @@ public class GameService : IGameService
         return (grid, placedShips);
     }
 
-    private ShipInfo? PlaceShip(char[][] grid, char letter, int size, int gridSize = 10)
+    private ShipInfo? TryPlaceRandomShip(char[][] grid, char letter, int size, int gridSize)
     {
-        bool placed = false;
-        int attempts = 0;
-        while (!placed && attempts < 100) // Safety break
+        const int MaxAttempts = 100;
+        
+        for (int i = 0; i < MaxAttempts; i++)
         {
-            attempts++;
-            // Orientation: 0 = Horizontal, 1 = Vertical
             bool horizontal = Random.Shared.Next(2) == 0;
+            
+            // Constrain random range to ensure it fits within bounds
+            int maxRow = horizontal ? gridSize : gridSize - size;
+            int maxCol = horizontal ? gridSize - size : gridSize;
 
-            // Grid dimensions
-            int rows = gridSize;
-            int cols = gridSize;
+            int row = Random.Shared.Next(maxRow);
+            int col = Random.Shared.Next(maxCol);
 
-            int row, col;
-
-            if (horizontal)
+            if (CanPlaceShip(grid, row, col, size, horizontal))
             {
-           
-                col = Random.Shared.Next(cols - size + 1);
-                row = Random.Shared.Next(rows);
-            }
-            else
-            {
-                // Ensure it fits vertically
-                col = Random.Shared.Next(cols);
-                row = Random.Shared.Next(rows - size + 1);
-            }
-
-            if (CanPlace(grid, row, col, size, horizontal))
-            {
-                DoPlace(grid, row, col, size, horizontal, letter);
+                PlaceShipOnGrid(grid, row, col, size, horizontal, letter);
                 return new ShipInfo
                 {
                     Letter = letter,
@@ -317,40 +297,63 @@ public class GameService : IGameService
         return null;
     }
 
-    private bool CanPlace(char[][] grid, int row, int col, int size, bool horizontal)
+    private void ValidateShipBounds(ShipInfo ship, int gridSize)
     {
+        int endRow = ship.IsHorizontal ? ship.Row : ship.Row + ship.Size - 1;
+        int endCol = ship.IsHorizontal ? ship.Col + ship.Size - 1 : ship.Col;
+
+        if (ship.Row < 0 || ship.Col < 0 || endRow >= gridSize || endCol >= gridSize)
+        {
+             throw new ArgumentException($"Ship {ship.Letter} is out of bounds.");
+        }
+    }
+
+    private bool CanPlaceShip(char[][] grid, int row, int col, int size, bool horizontal)
+    {
+        // NOTE: We assume bounds are already checked by ValidateShipBounds or Random logic
         if (horizontal)
         {
             for (int c = col; c < col + size; c++)
-            {
-                if (grid[row][c] != '\0') return false;
-            }
+                if (grid[row][c] != CellWater) return false;
         }
         else
         {
             for (int r = row; r < row + size; r++)
-            {
-                if (grid[r][col] != '\0') return false;
-            }
+                if (grid[r][col] != CellWater) return false;
         }
         return true;
     }
 
-    private void DoPlace(char[][] grid, int row, int col, int size, bool horizontal, char letter)
+    private void PlaceShipOnGrid(char[][] grid, int row, int col, int size, bool horizontal, char letter)
     {
         if (horizontal)
         {
-            for (int c = col; c < col + size; c++)
-            {
-                grid[row][c] = letter;
-            }
+            for (int c = col; c < col + size; c++) grid[row][c] = letter;
         }
         else
         {
-            for (int r = row; r < row + size; r++)
-            {
-                grid[r][col] = letter;
-            }
+            for (int r = row; r < row + size; r++) grid[r][col] = letter;
         }
+    }
+
+    private T[][] CreateEmptyGrid<T>(int size)
+    {
+        var grid = new T[size][];
+        for (int i = 0; i < size; i++)
+        {
+            grid[i] = new T[size];
+        }
+        return grid;
+    }
+
+    private bool?[][] InitFogOfWarGrid(int gridSize)
+    {
+        return CreateEmptyGrid<bool?>(gridSize);
+    }
+
+    private string GetCoordinateString(int row, int col)
+    {
+        // Convert 0,0 to A1
+        return $"{(char)('A' + row)}{col + 1}";
     }
 }

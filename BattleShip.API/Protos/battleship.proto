@@ -12,6 +12,7 @@ service Game {
 
 message GrpcCreateGameRequest {
     int32 difficulty = 1;
+    int32 gridSize = 2;
 }
 
 message Empty {}

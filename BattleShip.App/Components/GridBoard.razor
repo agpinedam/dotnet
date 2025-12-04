@@ -162,9 +162,7 @@
         var height = ship.Size * CellSize;
         var width = CellSize; 
         
-        // If horizontal, we rotate the vertical image -90 degrees
-        // Pivot is center of the top-left cell (which becomes left-most after rotation?)
-        // Wait, Home.razor used transform-origin: {pivot}px {pivot}px;
+        
         
         var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
         var pivot = CellSize / 2.0;

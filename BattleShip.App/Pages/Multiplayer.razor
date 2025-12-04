@@ -27,7 +27,10 @@
     }
     else
     {
-        <span class="ms-3 fw-bold text-info">@MultiplayerClient.Message</span>
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <button class="btn btn-danger" @onclick="LeaveGame">Leave Game</button>
+            <span class="ms-3 fw-bold text-info">@MultiplayerClient.Message</span>
+        </div>
     }
 </div>
 
@@ -126,6 +129,11 @@
         {
             _setupShips = MultiplayerClient.CurrentGame.Ships.Select(s => new ShipInfo { Letter = s.Letter, Size = s.Size }).ToList();
         }
+    }
+
+    private async Task LeaveGame()
+    {
+        await MultiplayerClient.LeaveGameAsync();
     }
 
     private async Task ConfirmPlacement()

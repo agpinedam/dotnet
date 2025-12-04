@@ -1,10 +1,6 @@
 ﻿using BattleShip.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace BattleShip.App.Services
 {
@@ -65,6 +61,17 @@ namespace BattleShip.App.Services
                 Message = $"Error connecting to server: {ex.Message}";
                 NotifyStateChanged();
             }
+        }
+
+        public async Task LeaveGameAsync()
+        {
+            if (_hubConnection != null)
+            {
+                await _hubConnection.DisposeAsync();
+            }
+            CurrentGame = null;
+            Message = null;
+            NotifyStateChanged();
         }
 
         public async Task ConfirmPlacementAsync(List<ShipInfo> ships)

@@ -20,6 +20,12 @@ public class GameClient
 
     private bool _useGrpc;
 
+    public void ResetGame()
+    {
+        CurrentGame = null;
+        Message = null;
+    }
+
     public async Task StartGameAsync(bool useGrpc = false, DifficultyLevel difficulty = DifficultyLevel.Medium, int gridSize = 10)
     {
         _useGrpc = useGrpc;

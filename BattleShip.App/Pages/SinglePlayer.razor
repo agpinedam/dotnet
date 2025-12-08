@@ -244,17 +244,44 @@
     private void RotateShip(ShipInfo ship)
     {
         if (GameClient.CurrentGame?.State != GameState.Setup) return;
-        ship.IsHorizontal = !ship.IsHorizontal;
+        
+        var tempShip = new ShipInfo 
+        { 
+            Letter = ship.Letter, 
+            Size = ship.Size, 
+            Row = ship.Row, 
+            Col = ship.Col, 
+            IsHorizontal = !ship.IsHorizontal 
+        };
+
+        var otherShips = _setupShips.Where(s => s != ship).ToList();
+        if (IsValidPlacement(tempShip, otherShips, _selectGridSize))
+        {
+            ship.IsHorizontal = !ship.IsHorizontal;
+        }
     }
 
     private void OnDrop(int row, int col)
     {
         if (GameClient.CurrentGame?.State != GameState.Setup) return;
         if (_draggedShip == null) return;
-        var limit = _selectGridSize;
-        if ((_draggedShip.IsHorizontal && col + _draggedShip.Size > limit) || (!_draggedShip.IsHorizontal && row + _draggedShip.Size > limit)) return;
-        _draggedShip.Row = row;
-        _draggedShip.Col = col;
+        
+        var tempShip = new ShipInfo 
+        { 
+            Letter = _draggedShip.Letter, 
+            Size = _draggedShip.Size, 
+            Row = row, 
+            Col = col, 
+            IsHorizontal = _draggedShip.IsHorizontal 
+        };
+
+        var otherShips = _setupShips.Where(s => s != _draggedShip).ToList();
+
+        if (IsValidPlacement(tempShip, otherShips, _selectGridSize))
+        {
+            _draggedShip.Row = row;
+            _draggedShip.Col = col;
+        }
         _draggedShip = null;
     }
 }

@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddSingleton<IAiService, AiService>();
 builder.Services.AddSingleton<IGameService, GameService>();
+builder.Services.AddSingleton<ILeaderboardService, LeaderboardService>();
 builder.Services.AddScoped<IValidator<AttackRequest>, AttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcAttackRequest>, GrpcAttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcUndoRequest>, GrpcUndoRequestValidator>();
@@ -41,6 +42,11 @@ app.MapGet("/", () => "BattleShip API is running!");
 // Map gRPC Service
 app.MapGrpcService<GrpcGameService>().EnableGrpcWeb();
 app.MapHub<GameHub>("/gamehub"); // Map SignalR Hub
+
+app.MapGet("/leaderboard", async (ILeaderboardService leaderboardService) =>
+{
+    return Results.Ok(await leaderboardService.GetLeaderboardAsync());
+});
 
 app.MapPost("/game", Ok<GameStatus> (CreateGameRequest request, IGameService gameService) =>
 {

@@ -1,0 +1,43 @@
+﻿@page "/leaderboard"
+@using BattleShip.Models
+@inject HttpClient Http
+
+<PageTitle>Leaderboard</PageTitle>
+
+<h1>Leaderboard</h1>
+
+@if (_leaderboard == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Rank</th>
+                <th>Player</th>
+                <th>Wins</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var (entry, index) in _leaderboard.Select((value, i) => (value, i)))
+            {
+                <tr>
+                    <td>@(index + 1)</td>
+                    <td>@entry.PlayerName</td>
+                    <td>@entry.Wins</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<LeaderboardEntry>? _leaderboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _leaderboard = await Http.GetFromJsonAsync<List<LeaderboardEntry>>("leaderboard");
+    }
+}

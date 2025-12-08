@@ -5,13 +5,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using BattleShip.Models;
+using BattleShip.API.Services;
 
 namespace BattleShip.API.Hubs
 {
     public class GameHub : Hub
     {
+        private readonly ILeaderboardService _leaderboardService;
         private static readonly ConcurrentDictionary<string, MultiplayerGame> _games = new ConcurrentDictionary<string, MultiplayerGame>();
         private static readonly ConcurrentDictionary<string, string> _connectionToGame = new ConcurrentDictionary<string, string>();
+
+        public GameHub(ILeaderboardService leaderboardService)
+        {
+            _leaderboardService = leaderboardService;
+        }
 
         public async Task CreateOrJoinGame(string gameId, string playerName, int gridSize = 10)
         {
@@ -113,6 +120,12 @@ namespace BattleShip.API.Hubs
                 };
                 game.History.Add(move);
 
+                if (game.GetState() == GameState.GameOver)
+                {
+                    var winner = game.IsLoser(opponent) ? attacker : opponent;
+                    await _leaderboardService.AddWinAsync(winner.Name);
+                }
+                
                 // Switch turns
                 game.CurrentTurnPlayer = opponent;
                 await SendGameState(gameId);

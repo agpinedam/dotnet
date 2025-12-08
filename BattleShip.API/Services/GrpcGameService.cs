@@ -65,39 +65,86 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
+    public override Task<GrpcGameStatus> UndoToTurn(GrpcUndoToTurnRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var gameId = Guid.Parse(request.GameId);
+            var game = _gameService.UndoToTurn(gameId, request.Turn);
+            return Task.FromResult(MapToGrpc(game));
+        }
+        catch (ArgumentException)
+        {
+            throw new RpcException(new Status(StatusCode.NotFound, "Game not found"));
+        }
+    }
+
+    public override Task<GrpcGameStatus> PlaceShips(GrpcPlaceShipsRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var gameId = Guid.Parse(request.GameId);
+            var ships = request.Ships.Select(s => new BattleShip.Models.ShipInfo
+            {
+                Letter = s.Letter.FirstOrDefault(),
+                Size = s.Size,
+                Row = s.Row,
+                Col = s.Col,
+                IsHorizontal = s.IsHorizontal
+            }).ToList();
+
+            var game = _gameService.PlaceShips(gameId, ships);
+            return Task.FromResult(MapToGrpc(game));
+        }
+        catch (ArgumentException ex)
+        {
+             if (ex.Message.Contains("not found"))
+                throw new RpcException(new Status(StatusCode.NotFound, ex.Message));
+             else
+                throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
+    }
+
     private GrpcGameStatus MapToGrpc(BattleShip.Models.GameStatus game)
     {
         var grpcGame = new GrpcGameStatus
         {
-            GameId = game.GameId.ToString(),
+            GameId = game.GameId ?? "",
             Winner = game.Winner ?? "",
             IsGameOver = game.IsGameOver,
             LastAttackResult = game.LastAttackResult ?? "",
-            LastAiAttackResult = game.LastAiAttackResult ?? ""
+            LastAiAttackResult = game.LastAiAttackResult ?? "",
+            State = (int)game.State
         };
 
         // Map Player Grid (char[][]) to repeated string
-        foreach (var row in game.PlayerGrid)
+        if (game.PlayerGrid != null)
         {
-            // Convert char[] to string
-            grpcGame.PlayerGrid.Add(new string(row));
+            foreach (var row in game.PlayerGrid)
+            {
+                // Convert char[] to string
+                grpcGame.PlayerGrid.Add(new string(row));
+            }
         }
 
         // Map Opponent Grid (bool?[][]) to repeated OpponentRow
-        foreach (var row in game.OpponentGrid)
+        if (game.OpponentGrid != null)
         {
-            var grpcRow = new OpponentRow();
-            foreach (var cell in row)
+            foreach (var row in game.OpponentGrid)
             {
-                // 0 = null, 1 = hit (true), 2 = miss (false)
-                int val = 0;
-                if (cell.HasValue)
+                var grpcRow = new OpponentRow();
+                foreach (var cell in row)
                 {
-                    val = cell.Value ? 1 : 2;
+                    // 0 = null, 1 = hit (true), 2 = miss (false)
+                    int val = 0;
+                    if (cell.HasValue)
+                    {
+                        val = cell.Value ? 1 : 2;
+                    }
+                    grpcRow.Values.Add(val);
                 }
-                grpcRow.Values.Add(val);
+                grpcGame.OpponentGrid.Add(grpcRow);
             }
-            grpcGame.OpponentGrid.Add(grpcRow);
         }
 
         // Map History

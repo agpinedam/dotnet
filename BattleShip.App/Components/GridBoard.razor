@@ -9,7 +9,7 @@
              <img src="/images/@GetShipImage(ship.Size)" 
                   draggable="@(IsDraggable ? "true" : "false")"
                   @ondragstart="() => OnDragStart.InvokeAsync(ship)"
-                  @onclick="() => OnRotate.InvokeAsync(ship)"
+                  @onclick="() => { if (IsDraggable) OnRotate.InvokeAsync(ship); }"
                   style="@GetShipStyle(ship)"
                   class="ship-element @(IsDraggable ? "cursor-grab" : "")"
                   alt="Ship" />

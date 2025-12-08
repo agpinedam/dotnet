@@ -163,10 +163,21 @@
         return @<span class="@color">@result</span>;
     }
 
-    private void OnDragStart(ShipInfo ship) => _draggedShip = ship;
-    private void RotateShip(ShipInfo ship) => ship.IsHorizontal = !ship.IsHorizontal;
+    private void OnDragStart(ShipInfo ship)
+    {
+        if (GameClient.CurrentGame?.State != GameState.Setup) return;
+        _draggedShip = ship;
+    }
+
+    private void RotateShip(ShipInfo ship)
+    {
+        if (GameClient.CurrentGame?.State != GameState.Setup) return;
+        ship.IsHorizontal = !ship.IsHorizontal;
+    }
+
     private void OnDrop(int row, int col)
     {
+        if (GameClient.CurrentGame?.State != GameState.Setup) return;
         if (_draggedShip == null) return;
         var limit = _selectGridSize;
         if ((_draggedShip.IsHorizontal && col + _draggedShip.Size > limit) || (!_draggedShip.IsHorizontal && row + _draggedShip.Size > limit)) return;

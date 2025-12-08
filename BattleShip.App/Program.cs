@@ -27,5 +27,6 @@ builder.Services.AddSingleton(services =>
 // Register GameClient as Scoped because it depends on Scoped HttpClient
 builder.Services.AddScoped<GameClient>();
 builder.Services.AddScoped<MultiplayerGameClient>();
+builder.Services.AddScoped<ShipPlacementService>();
 
 await builder.Build().RunAsync();

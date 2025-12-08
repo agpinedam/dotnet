@@ -21,6 +21,11 @@ public class GrpcGameService : Game.GameBase
     {
         var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
         int size = request.GridSize > 0 ? request.GridSize : 10;
+        // Validar rango de tamaño de grilla
+        if (size < 5 || size > 20)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Grid size must be between 5 and 20."));
+        }
         var game = _gameService.CreateGame(difficulty, size);
         return Task.FromResult(MapToGrpc(game));
     }

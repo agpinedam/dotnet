@@ -82,6 +82,10 @@
         z-index: 20;
         pointer-events: none;
     }
+    
+    .ship-element {
+        /* Styles handled by inline style */
+    }
 </style>
 
 @code {
@@ -106,8 +110,8 @@
 
     private int GridRows => PlayerGrid?.Length ?? OpponentGrid?.Length ?? Rows;
     private int GridCols => PlayerGrid?[0].Length ?? OpponentGrid?[0].Length ?? Cols;
-
-    private string ContainerStyle => $"width: {GridCols * CellSize}px; height: {GridRows * CellSize}px; background-color: #78a7f5; border: 2px solid #0a2fa8;";
+    
+    private string ContainerStyle => $"width: {GridCols * CellSize}px; height: {GridRows * CellSize}px;";
 
     private enum CellState { Empty, Hit, Miss }
 
@@ -161,8 +165,6 @@
         var left = ship.Col * CellSize;
         var height = ship.Size * CellSize;
         var width = CellSize; 
-        
-        
         
         var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
         var pivot = CellSize / 2.0;

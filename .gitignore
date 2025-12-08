@@ -48,6 +48,7 @@ bld/
 *.vsxpscc
 *.vsw
 *.code-workspace
+*.idea/
 
 # Visual Studio Code
 .vscode/

@@ -9,25 +9,39 @@ public class GrpcGameService : Game.GameBase
     private readonly IGameService _gameService;
     private readonly IValidator<GrpcAttackRequest> _attackValidator;
     private readonly IValidator<GrpcUndoRequest> _undoValidator;
+    private readonly IValidator<GrpcCreateGameRequest> _createGameValidator;
+    private readonly IValidator<GrpcPlaceShipsRequest> _placeShipsValidator;
+    private readonly IValidator<GrpcUndoToTurnRequest> _undoToTurnValidator;
 
-    public GrpcGameService(IGameService gameService, IValidator<GrpcAttackRequest> attackValidator, IValidator<GrpcUndoRequest> undoValidator)
+    public GrpcGameService(
+        IGameService gameService, 
+        IValidator<GrpcAttackRequest> attackValidator, 
+        IValidator<GrpcUndoRequest> undoValidator,
+        IValidator<GrpcCreateGameRequest> createGameValidator,
+        IValidator<GrpcPlaceShipsRequest> placeShipsValidator,
+        IValidator<GrpcUndoToTurnRequest> undoToTurnValidator)
     {
         _gameService = gameService;
         _attackValidator = attackValidator;
         _undoValidator = undoValidator;
+        _createGameValidator = createGameValidator;
+        _placeShipsValidator = placeShipsValidator;
+        _undoToTurnValidator = undoToTurnValidator;
     }
 
-    public override Task<GrpcGameStatus> CreateGame(GrpcCreateGameRequest request, ServerCallContext context)
+    public override async Task<GrpcGameStatus> CreateGame(GrpcCreateGameRequest request, ServerCallContext context)
     {
+        var validationResult = await _createGameValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+             throw new RpcException(new Status(StatusCode.InvalidArgument, validationResult.ToString()));
+        }
+
         var difficulty = (BattleShip.Models.DifficultyLevel)request.Difficulty;
         int size = request.GridSize > 0 ? request.GridSize : 10;
-        // Validar rango de tamaño de grilla
-        if (size < 5 || size > 20)
-        {
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Grid size must be between 5 and 20."));
-        }
+        
         var game = _gameService.CreateGame(difficulty, size);
-        return Task.FromResult(MapToGrpc(game));
+        return MapToGrpc(game);
     }
 
     public override async Task<GrpcGameStatus> Attack(GrpcAttackRequest request, ServerCallContext context)
@@ -70,13 +84,19 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
-    public override Task<GrpcGameStatus> UndoToTurn(GrpcUndoToTurnRequest request, ServerCallContext context)
+    public override async Task<GrpcGameStatus> UndoToTurn(GrpcUndoToTurnRequest request, ServerCallContext context)
     {
+        var validationResult = await _undoToTurnValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+             throw new RpcException(new Status(StatusCode.InvalidArgument, validationResult.ToString()));
+        }
+
         try
         {
             var gameId = Guid.Parse(request.GameId);
             var game = _gameService.UndoToTurn(gameId, request.Turn);
-            return Task.FromResult(MapToGrpc(game));
+            return MapToGrpc(game);
         }
         catch (ArgumentException)
         {
@@ -84,8 +104,14 @@ public class GrpcGameService : Game.GameBase
         }
     }
 
-    public override Task<GrpcGameStatus> PlaceShips(GrpcPlaceShipsRequest request, ServerCallContext context)
+    public override async Task<GrpcGameStatus> PlaceShips(GrpcPlaceShipsRequest request, ServerCallContext context)
     {
+        var validationResult = await _placeShipsValidator.ValidateAsync(request);
+        if (!validationResult.IsValid)
+        {
+             throw new RpcException(new Status(StatusCode.InvalidArgument, validationResult.ToString()));
+        }
+
         try
         {
             var gameId = Guid.Parse(request.GameId);
@@ -99,7 +125,7 @@ public class GrpcGameService : Game.GameBase
             }).ToList();
 
             var game = _gameService.PlaceShips(gameId, ships);
-            return Task.FromResult(MapToGrpc(game));
+            return MapToGrpc(game);
         }
         catch (ArgumentException ex)
         {

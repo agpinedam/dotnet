@@ -13,8 +13,13 @@ builder.Services.AddSingleton<IAiService, AiService>();
 builder.Services.AddSingleton<IGameService, GameService>();
 builder.Services.AddSingleton<ILeaderboardService, LeaderboardService>();
 builder.Services.AddScoped<IValidator<AttackRequest>, AttackRequestValidator>();
+builder.Services.AddScoped<IValidator<CreateGameRequest>, CreateGameRequestValidator>();
+builder.Services.AddScoped<IValidator<PlaceShipsRequest>, PlaceShipsRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcAttackRequest>, GrpcAttackRequestValidator>();
 builder.Services.AddScoped<IValidator<GrpcUndoRequest>, GrpcUndoRequestValidator>();
+builder.Services.AddScoped<IValidator<GrpcCreateGameRequest>, GrpcCreateGameRequestValidator>();
+builder.Services.AddScoped<IValidator<GrpcPlaceShipsRequest>, GrpcPlaceShipsRequestValidator>();
+builder.Services.AddScoped<IValidator<GrpcUndoToTurnRequest>, GrpcUndoToTurnRequestValidator>();
 builder.Services.AddGrpc(); // Add gRPC services
 builder.Services.AddSignalR(); // Add SignalR
 
@@ -48,8 +53,13 @@ app.MapGet("/leaderboard", async (ILeaderboardService leaderboardService) =>
     return Results.Ok(await leaderboardService.GetLeaderboardAsync());
 });
 
-app.MapPost("/game", Ok<GameStatus> (CreateGameRequest request, IGameService gameService) =>
+app.MapPost("/game", async Task<Results<Ok<GameStatus>, ValidationProblem>> (CreateGameRequest request, IGameService gameService, IValidator<CreateGameRequest> validator) =>
 {
+    var validationResult = await validator.ValidateAsync(request);
+    if (!validationResult.IsValid)
+    {
+        return TypedResults.ValidationProblem(validationResult.ToDictionary());
+    }
     var game = gameService.CreateGame(request.Difficulty, request.GridSize);
     return TypedResults.Ok(game);
 });
@@ -86,8 +96,9 @@ app.MapPost("/game/{id}/undo", Results<Ok<GameStatus>, NotFound<string>> (Guid i
     }
 });
 
-app.MapPost("/game/{id}/undo-to-turn/{turn}", Results<Ok<GameStatus>, NotFound<string>> (Guid id, int turn, IGameService gameService) =>
+app.MapPost("/game/{id}/undo-to-turn/{turn}", Results<Ok<GameStatus>, NotFound<string>, BadRequest<string>> (Guid id, int turn, IGameService gameService) =>
 {
+    if (turn <= 0) return TypedResults.BadRequest("Turn must be greater than 0.");
     try
     {
         var game = gameService.UndoToTurn(id, turn);
@@ -99,9 +110,16 @@ app.MapPost("/game/{id}/undo-to-turn/{turn}", Results<Ok<GameStatus>, NotFound<s
     }
 });
 
-app.MapPost("/game/{id}/place-ships", Results<Ok<GameStatus>, BadRequest<string>> (Guid id, PlaceShipsRequest request, IGameService gameService) =>
+app.MapPost("/game/{id}/place-ships", async Task<Results<Ok<GameStatus>, BadRequest<string>, ValidationProblem>> (Guid id, PlaceShipsRequest request, IGameService gameService, IValidator<PlaceShipsRequest> validator) =>
 {
     if (id != request.GameId) return TypedResults.BadRequest("Game ID mismatch");
+    
+    var validationResult = await validator.ValidateAsync(request);
+    if (!validationResult.IsValid)
+    {
+        return TypedResults.ValidationProblem(validationResult.ToDictionary());
+    }
+
     try
     {
         var status = gameService.PlaceShips(id, request.Ships);

@@ -46,76 +46,114 @@
 
 @if (GameClient.CurrentGame != null)
 {
-    <div class="container-fluid">
-        @if (GameClient.CurrentGame.State == GameState.Setup)
-        {
-            <div class="alert alert-info d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-info-circle-fill me-2"></i>Place your ships. Drag to move, click to rotate.</span>
-                <button class="btn btn-success btn-sm" @onclick="ConfirmPlacement">Confirm Placement</button>
-            </div>
-        }
+    <div class="container-fluid game-container">
+        <div class="game-boards">
+            @if (GameClient.CurrentGame.State == GameState.Setup)
+            {
+                <div class="alert alert-info d-flex justify-content-between align-items-center mb-3">
+                    <span><i class="bi bi-info-circle-fill me-2"></i>Place your ships. Drag to move, click to rotate.</span>
+                    <button class="btn btn-success btn-sm" @onclick="ConfirmPlacement">Confirm Placement</button>
+                </div>
+            }
 
-        <div class="row g-4">
-            <div class="col-md-6">
-                <h3 class="text-primary">Your Grid</h3>
-                <GridBoard 
-                    PlayerGrid="@GameClient.CurrentGame.PlayerGrid"
-                    Ships="@(GameClient.CurrentGame.State == GameState.Setup ? _setupShips : GameClient.CurrentGame.Ships)"
-                    IsDraggable="@(GameClient.CurrentGame.State == GameState.Setup)"
-                    IsInteractive="@false"
-                    OnDrop="@(args => OnDrop(args.Row, args.Col))"
-                    OnDragStart="@OnDragStart"
-                    OnRotate="@RotateShip"
-                />
-            </div>
+            <div class="d-flex flex-wrap gap-4 flex-grow-1 justify-content-center" style="min-height: 0; overflow-y: auto;">
+                <div class="d-flex flex-column align-items-center" style="flex: 1 1 auto;">
+                    <h3 class="text-primary flex-shrink-0">Your Grid</h3>
+                    <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="min-height: 0;">
+                        <GridBoard 
+                            PlayerGrid="@GameClient.CurrentGame.PlayerGrid"
+                            Ships="@(GameClient.CurrentGame.State == GameState.Setup ? _setupShips : GameClient.CurrentGame.Ships)"
+                            IsDraggable="@(GameClient.CurrentGame.State == GameState.Setup)"
+                            IsInteractive="@false"
+                            OnDrop="@(args => OnDrop(args.Row, args.Col))"
+                            OnDragStart="@OnDragStart"
+                            OnRotate="@RotateShip"
+                        />
+                    </div>
+                </div>
 
-            <div class="col-md-6">
-                <h3 class="text-danger">Opponent Grid</h3>
-                <GridBoard 
-                    OpponentGrid="@GameClient.CurrentGame.OpponentGrid"
-                    IsInteractive="@(GameClient.CurrentGame.State == GameState.Playing)"
-                    OnCellClick="@(args => Attack(args.Row, args.Col))"
-                />
-            </div>
-        </div>
-
-        @if (GameClient.CurrentGame.History.Any())
-        {
-            <div class="row mt-5">
-                <div class="col-12">
-                    <h3>Battle Log</h3>
-                    <div class="history-container shadow-sm">
-                        <table class="table table-hover table-bordered mb-0">
-                            <thead class="table-dark sticky-top">
-                                <tr>
-                                    <th>Turn</th>
-                                    <th>Your Move</th>
-                                    <th>Result</th>
-                                    <th>Enemy Move</th>
-                                    <th>Enemy Result</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            @foreach (var move in ((IEnumerable<MoveHistory>)GameClient.CurrentGame.History).Reverse())
-                            {
-                                <tr @onclick="() => UndoToTurnAsync(move.Turn - 1)" 
-                                    class="cursor-pointer" 
-                                    title="Click to time travel to this turn">
-                                    <td>@move.Turn</td>
-                                    <td>@move.PlayerMove</td>
-                                    <td>@GetResultBadge(move.PlayerResult)</td>
-                                    <td>@move.AiMove</td>
-                                    <td>@GetResultBadge(move.AiResult)</td>
-                                </tr>
-                            }
-                            </tbody>
-                        </table>
+                <div class="d-flex flex-column align-items-center" style="flex: 1 1 auto;">
+                    <h3 class="text-danger flex-shrink-0">Opponent Grid</h3>
+                    <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="min-height: 0;">
+                        <GridBoard 
+                            OpponentGrid="@GameClient.CurrentGame.OpponentGrid"
+                            IsInteractive="@(GameClient.CurrentGame.State == GameState.Playing)"
+                            OnCellClick="@(args => Attack(args.Row, args.Col))"
+                        />
                     </div>
                 </div>
             </div>
-        }
+        </div>
+
+        <div class="game-history">
+            @if (GameClient.CurrentGame.History.Any())
+            {
+                <h5 class="sticky-top bg-light py-2 border-bottom">Battle Log</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-bordered mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Turn</th>
+                                <th>Your Move</th>
+                                <th>Result</th>
+                                <th>Enemy Move</th>
+                                <th>Enemy Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var move in ((IEnumerable<MoveHistory>)GameClient.CurrentGame.History).Reverse())
+                        {
+                            <tr @onclick="() => UndoToTurnAsync(move.Turn - 1)" 
+                                class="cursor-pointer" 
+                                title="Click to time travel to this turn">
+                                <td>@move.Turn</td>
+                                <td>@move.PlayerMove</td>
+                                <td>@GetResultBadge(move.PlayerResult)</td>
+                                <td>@move.AiMove</td>
+                                <td>@GetResultBadge(move.AiResult)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center text-muted mt-4">
+                    <i class="bi bi-clock-history fs-2"></i>
+                    <p>Battle history will appear here.</p>
+                </div>
+            }
+        </div>
     </div>
 }
+
+<style>
+    .game-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 160px); /* Adjust based on header/controls height */
+        overflow: hidden;
+    }
+
+    .game-boards {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding-bottom: 1rem;
+        min-height: 0; /* Important for flex scrolling */
+    }
+
+    .game-history {
+        height: 25%; /* Fixed 1/4 height */
+        flex-shrink: 0;
+        border-top: 4px solid #dee2e6;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 0.5rem 1rem;
+    }
+</style>
 
 @code {
     private DifficultyLevel _selectedDifficulty = DifficultyLevel.Medium;

@@ -6,13 +6,13 @@
     {
         foreach (var ship in Ships)
         {
-             <img src="/images/@GetShipImage(ship.Size)" 
-                  draggable="@(IsDraggable ? "true" : "false")"
-                  @ondragstart="() => OnDragStart.InvokeAsync(ship)"
-                  @onclick="() => { if (IsDraggable) OnRotate.InvokeAsync(ship); }"
-                  style="@GetShipStyle(ship)"
-                  class="ship-element @(IsDraggable ? "cursor-grab" : "")"
-                  alt="Ship" />
+                <img src="/images/@GetShipImage(ship.Size)" 
+                    draggable="@(IsDraggable ? "true" : "false")"
+                    @ondragstart="() => OnDragStart.InvokeAsync(ship)"
+                    @onclick="() => { if (IsDraggable) OnRotate.InvokeAsync(ship); }"
+                    style="@GetShipStyle(ship)"
+                    class="ship-element @(IsDraggable ? "cursor-grab" : "")"
+                    alt="Ship" />
         }
     }
 
@@ -26,19 +26,18 @@
                 var cellState = GetCellState(row, col);
                 
                 <div class="grid-cell @(IsClickable(row, col) ? "cursor-crosshair hover-effect" : "")"
-                     style="width: @(CellSize)px; height: @(CellSize)px;"
-                     ondragover="event.preventDefault();"
-                     @ondrop="() => OnDrop.InvokeAsync((row, col))"
-                     @onclick="() => HandleClick(row, col)">
-                     
-                     @if (cellState == CellState.Hit)
-                     {
-                         <img src="/images/hit.png" alt="Hit" class="img-fluid marker-overlay" />
-                     }
-                     else if (cellState == CellState.Miss)
-                     {
-                         <img src="/images/miss.png" alt="Miss" class="img-fluid marker-overlay" />
-                     }
+                        ondragover="event.preventDefault();"
+                        @ondrop="() => OnDrop.InvokeAsync((row, col))"
+                        @onclick="() => HandleClick(row, col)">
+                        
+                        @if (cellState == CellState.Hit)
+                        {
+                            <img src="/images/hit.png" alt="Hit" class="img-fluid marker-overlay" />
+                        }
+                        else if (cellState == CellState.Miss)
+                        {
+                            <img src="/images/miss.png" alt="Miss" class="img-fluid marker-overlay" />
+                        }
                 </div>
             }
         </div>
@@ -46,22 +45,24 @@
 </div>
 
 <style>
-    .battleship-responsive-wrapper {
-        width: 100%;
-        max-width: 600px; 
-        margin: 0 auto;
-        position: relative;
-    }
-
     .battleship-grid-container {
         display: flex;
         flex-direction: column;
         position: relative;
-        width: 100%;
-        aspect-ratio: var(--grid-cols) / var(--grid-rows); 
+        
+        /* Aspect Ratio & Sizing Logic */
+        aspect-ratio: var(--grid-cols) / var(--grid-rows);
+        width: 100%;               /* Try to fill the parent width */
+        max-width: var(--max-width); /* But stop at 35px * cols */
+        max-height: 100%;          /* And don't overflow parent height */
+        min-width: var(--min-width); /* Don't shrink below 15px * cols */
+        
+        margin: auto;
+        
+        /* Visuals */
         background-color: #78a7f5;
         border: 2px solid #0a2fa8;
-        box-sizing: content-box;
+        box-sizing: border-box;
     }
 
     .grid-row {
@@ -82,19 +83,9 @@
     }
 
     /* Style for ships */
-    .ship-container {
-        position: absolute;
-        z-index: 10;
-        display: flex; 
-        justify-content: center;
-        align-items: center;
-    }
-    
-    .ship-image {
-        width: 100%;
-        height: 100%;
-        display: block;
-        object-fit: fill; 
+    .ship-element {
+        /* Styles are set inline via GetShipStyle, but we can add common props here */
+        pointer-events: auto; 
     }
 
     /* Utilidades */
@@ -136,7 +127,7 @@
     private int GridRows => PlayerGrid?.Length ?? OpponentGrid?.Length ?? Rows;
     private int GridCols => PlayerGrid?[0].Length ?? OpponentGrid?[0].Length ?? Cols;
     
-    private string ContainerStyle => $"width: {GridCols * CellSize}px; height: {GridRows * CellSize}px;";
+    private string ContainerStyle => $"--grid-cols: {GridCols}; --grid-rows: {GridRows}; --min-width: {GridCols * 15}px; --max-width: {GridCols * 35}px;";
 
     private enum CellState { Empty, Hit, Miss }
 
@@ -186,22 +177,31 @@
 
     private string GetShipStyle(ShipInfo ship)
     {
-        var top = ship.Row * CellSize;
-        var left = ship.Col * CellSize;
-        var height = ship.Size * CellSize;
-        var width = CellSize; 
+        // Percentage-based positioning
+        var top = (double)ship.Row / GridRows * 100;
+        var left = (double)ship.Col / GridCols * 100;
+        
+        // Dimensions relative to the grid
+        // We assume the ship element is vertical (1xSize) and rotate it if needed
+        var width = 100.0 / GridCols;
+        var height = (double)ship.Size / GridRows * 100;
         
         var rotation = ship.IsHorizontal ? "rotate(-90deg)" : "none";
-        var pivot = CellSize / 2.0;
+        
+        // Transform origin: Center of the first cell (top-left of the ship)
+        // X: 50% of the width (which is 1 cell wide)
+        // Y: Half of one cell height. Since total height is Size cells, 1 cell is (100% / Size). Half is (50% / Size).
+        var originY = (0.5 / ship.Size) * 100;
+        var transformOrigin = $"50% {originY:0.00}%";
 
         return $@"
             position: absolute; 
-            top: {top}px; 
-            left: {left}px; 
-            width: {width}px; 
-            height: {height}px; 
+            top: {top:0.00}%; 
+            left: {left:0.00}%; 
+            width: {width:0.00}%; 
+            height: {height:0.00}%; 
             z-index: 10; 
-            transform-origin: {pivot}px {pivot}px;
+            transform-origin: {transformOrigin};
             transform: {rotation};";
     }
 }

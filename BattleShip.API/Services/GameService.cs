@@ -241,6 +241,7 @@ public class GameService : IGameService
             Ships = game.PlayerShips,
             OpponentGrid = game.OpponentGrid,
             Winner = game.Winner,
+            IsGameOver = game.State == GameState.GameOver,
             LastAttackResult = game.LastAttackResult,
             LastAiAttackResult = game.LastAiAttackResult,
             History = game.History

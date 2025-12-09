@@ -10,6 +10,7 @@ namespace BattleShip.App.Services
         private readonly NavigationManager _navigationManager;
         private readonly IConfiguration _configuration;
         private TaskCompletionSource<bool>? _gameStateReceived;
+        private string? _playerName;
 
         public GameStatus? CurrentGame { get; private set; }
         public string? Message { get; private set; }
@@ -23,6 +24,7 @@ namespace BattleShip.App.Services
 
         public async Task JoinGameAsync(string gameId, string playerName, int gridSize)
         {
+            _playerName = playerName;
             _gameStateReceived = new TaskCompletionSource<bool>();
             var backendUrl = _configuration["BackendUrl"] ?? "http://localhost:5200";
             _hubConnection = new HubConnectionBuilder()
@@ -93,18 +95,33 @@ namespace BattleShip.App.Services
         private void UpdateMessage()
         {
             if (CurrentGame == null) return;
+            
             if (CurrentGame.IsGameOver)
             {
-                Message = $"Game Over! Winner: {CurrentGame.Winner}";
+                if (CurrentGame.Winner == _playerName)
+                {
+                    Message = "You Won! Congratulations!";
+                }
+                else
+                {
+                    Message = "You Lost! Better luck next time.";
+                }
                 return;
             }
+
             switch (CurrentGame.State)
             {
                 case GameState.Setup:
                     Message = CurrentGame.ShipsPlaced ? "Waiting for opponent..." : "Place your ships.";
                     break;
                 case GameState.Playing:
-                    Message = CurrentGame.IsMyTurn ? "Your turn." : "Opponent's turn.";
+                    // Display whose turn it is and the result of the last action
+                    string turnMsg = CurrentGame.IsMyTurn ? "Your turn." : "Opponent's turn.";
+                    string lastAction = !string.IsNullOrEmpty(CurrentGame.LastAttackResult) 
+                        ? $" | Last: {CurrentGame.LastAttackResult}" 
+                        : "";
+                    
+                    Message = $"{turnMsg}{lastAction}";
                     break;
             }
         }

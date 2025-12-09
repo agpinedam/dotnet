@@ -65,6 +65,7 @@ public class GameClient
         {
             GameId = grpcGame.GameId,
             Winner = string.IsNullOrEmpty(grpcGame.Winner) ? null : grpcGame.Winner,
+            IsGameOver = grpcGame.IsGameOver,
             LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
             LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
             State = (GameState)grpcGame.State,
@@ -211,18 +212,18 @@ public class GameClient
 
             if (CurrentGame?.IsGameOver == true)
             {
-                if ( CurrentGame.Winner=="Player")
+                if (CurrentGame.Winner == "Player")
                 {
-                    Message = "Vous avez gagné!";
+                    Message = "You Won! Congratulations!";
                 }
                 else
                 {
-                    Message = "Vous avez perdu!";
+                    Message = "You Lost! Better luck next time.";
                 }
-                
             }
             else
             {
+                // Display the result of the last turn (Player's move and AI's response)
                 Message = $"{CurrentGame?.LastAttackResult} | {CurrentGame?.LastAiAttackResult}";
             }
         }

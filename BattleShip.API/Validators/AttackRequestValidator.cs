@@ -12,8 +12,5 @@ public class AttackRequestValidator : AbstractValidator<AttackRequest>
 
         RuleFor(x => x.Col)
             .GreaterThanOrEqualTo(0).WithMessage("Column must be positive.");
-            
-        // We cannot validate upper bounds here easily without knowing the game's grid size.
-        // The service layer will handle OutOfBounds checks.
     }
 }

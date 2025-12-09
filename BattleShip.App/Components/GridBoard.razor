@@ -1,4 +1,5 @@
 @using BattleShip.Models
+@using BattleShip.App.Constants
 @using Microsoft.AspNetCore.Components.Web
 
 <div class="battleship-grid-container" style="@ContainerStyle">
@@ -6,7 +7,7 @@
     {
         foreach (var ship in Ships)
         {
-                <img src="/images/@GetShipImage(ship.Size)" 
+                <img src="@($"{AssetConstants.ShipImageBase}{GetShipImage(ship.Size)}")" 
                     draggable="@(IsDraggable ? "true" : "false")"
                     @ondragstart="() => OnDragStart.InvokeAsync(ship)"
                     @onclick="() => { if (IsDraggable) OnRotate.InvokeAsync(ship); }"
@@ -32,11 +33,11 @@
                         
                         @if (cellState == CellState.Hit)
                         {
-                            <img src="/images/hit.png" alt="Hit" class="img-fluid marker-overlay" />
+                            <img src="@AssetConstants.HitImage" alt="Hit" class="img-fluid marker-overlay" />
                         }
                         else if (cellState == CellState.Miss)
                         {
-                            <img src="/images/miss.png" alt="Miss" class="img-fluid marker-overlay" />
+                            <img src="@AssetConstants.MissImage" alt="Miss" class="img-fluid marker-overlay" />
                         }
                 </div>
             }

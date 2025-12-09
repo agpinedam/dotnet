@@ -1,12 +1,15 @@
 using System.Collections.Concurrent;
 using BattleShip.API.Services;
 using BattleShip.Models;
+using Microsoft.Extensions.Configuration;
 
 namespace BattleShip.API.Services;
 
 public class GameService : IGameService
 {
     private readonly IAiService _aiService;
+    private readonly List<(char Letter, int Size)> _shipConfig;
+    
     private const char CellHit = 'X';
     private const char CellMiss = 'O';
     private const char CellWater = '\0'; 
@@ -14,15 +17,29 @@ public class GameService : IGameService
     // Thread-safe storage for game states. 
     private static readonly ConcurrentDictionary<Guid, InternalGame> Games = new();
 
-    // Ship configuration: Letter and Size
-    private static readonly List<(char Letter, int Size)> ShipConfig = new()
-    {
-        ('A', 4), ('B', 3), ('C', 3), ('D', 2), ('E', 2), ('F', 1)
-    };
-
-    public GameService(IAiService aiService)
+    public GameService(IAiService aiService, IConfiguration configuration)
     {
         _aiService = aiService;
+        
+        var configItems = configuration.GetSection("ShipConfig").Get<List<ShipConfigItem>>();
+        if (configItems != null)
+        {
+            _shipConfig = configItems.Select(x => (x.Letter[0], x.Size)).ToList();
+        }
+        else
+        {
+            // Fallback default
+            _shipConfig = new List<(char, int)>
+            {
+                ('A', 4), ('B', 3), ('C', 3), ('D', 2), ('E', 2), ('F', 1)
+            };
+        }
+    }
+
+    private class ShipConfigItem
+    {
+        public string Letter { get; set; } = string.Empty;
+        public int Size { get; set; }
     }
 
     public GameStatus CreateGame(DifficultyLevel difficulty, int gridSize)
@@ -48,8 +65,9 @@ public class GameService : IGameService
             AiMoves = aiMoves,
             OpponentGrid = InitFogOfWarGrid(gridSize),
             // Track alive ships for game logic optimization
-            AlivePlayerShips = ShipConfig.Select(s => s.Size).ToList() 
+            AlivePlayerShips = _shipConfig.Select(s => s.Size).ToList() 
         };
+
 
         // Thread-safe addition
         Games.TryAdd(gameId, game);
@@ -255,7 +273,7 @@ public class GameService : IGameService
         var grid = CreateEmptyGrid<char>(gridSize);
         var placedShips = new List<ShipInfo>();
 
-        foreach (var (letter, size) in ShipConfig)
+        foreach (var (letter, size) in _shipConfig)
         {
             var info = TryPlaceRandomShip(grid, letter, size, gridSize);
             if (info != null)

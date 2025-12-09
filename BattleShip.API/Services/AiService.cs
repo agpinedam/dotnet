@@ -1,9 +1,22 @@
+using BattleShip.API.Services.Strategies;
 using BattleShip.Models;
 
 namespace BattleShip.API.Services;
 
 public class AiService : IAiService
 {
+    private readonly Dictionary<DifficultyLevel, IAiStrategy> _strategies;
+
+    public AiService()
+    {
+        _strategies = new Dictionary<DifficultyLevel, IAiStrategy>
+        {
+            { DifficultyLevel.Easy, new EasyAiStrategy() },
+            { DifficultyLevel.Medium, new MediumAiStrategy() },
+            { DifficultyLevel.Hard, new HardAiStrategy() }
+        };
+    }
+
     public Queue<(int, int)> GenerateAiMoves(int gridSize)
     {
         var aiMoves = new Queue<(int, int)>();
@@ -47,7 +60,7 @@ public class AiService : IAiService
     {
         int aiRow = -1, aiCol = -1;
         bool foundMove = false;
-        int gridSize = game.PlayerGrid.Length; // Detect grid size dynamically
+        int gridSize = game.PlayerGrid.Length;
 
         // 1. Priority: Check Target Stack (Hunt Mode) - Only for Medium and Hard
         if (game.Difficulty != DifficultyLevel.Easy)
@@ -65,71 +78,20 @@ public class AiService : IAiService
             }
         }
 
-        // 2. Fallback: Search Mode
+        // 2. Fallback: Use Strategy
         if (!foundMove)
         {
-            if (game.Difficulty == DifficultyLevel.Hard)
+            if (_strategies.TryGetValue(game.Difficulty, out var strategy))
             {
-                // Hard: Heatmap Strategy with Parity Optimization (Smarter)
-                var bestMove = GetBestHeatmapMove(game, useParity: true);
-                if (bestMove.HasValue)
+                var move = strategy.GetNextMove(game);
+                if (move.HasValue)
                 {
-                    aiRow = bestMove.Value.Row;
-                    aiCol = bestMove.Value.Col;
+                    aiRow = move.Value.Row;
+                    aiCol = move.Value.Col;
                     foundMove = true;
-                }
-            }
-            else if (game.Difficulty == DifficultyLevel.Medium)
-            {
-                // Medium: Heatmap Strategy without Parity
-                var bestMove = GetBestHeatmapMove(game, useParity: false);
-                if (bestMove.HasValue)
-                {
-                    aiRow = bestMove.Value.Row;
-                    aiCol = bestMove.Value.Col;
-                    foundMove = true;
-                }
-            }
-            
-            // Easy (or fallback if queues empty): Random Random
-            if (!foundMove)
-            {
-                // Simple random search
-                int attempts = 0;
-                while (!foundMove && attempts < 1000)
-                {
-                    attempts++;
-                    int r = Random.Shared.Next(gridSize);
-                    int c = Random.Shared.Next(gridSize);
-                    if (IsValidAttack(game.PlayerGrid, r, c))
-                    {
-                        aiRow = r;
-                        aiCol = c;
-                        foundMove = true;
-                    }
-                }
-                
-                // Last resort: linear scan
-                if (!foundMove)
-                {
-                    for (int r = 0; r < gridSize; r++)
-                    {
-                        for (int c = 0; c < gridSize; c++)
-                        {
-                            if (IsValidAttack(game.PlayerGrid, r, c))
-                            {
-                                aiRow = r;
-                                aiCol = c;
-                                foundMove = true;
-                                goto MoveFound;
-                            }
-                        }
-                    }
                 }
             }
         }
-
-        MoveFound:
 
         if (!foundMove)
         {
@@ -360,106 +322,6 @@ public class AiService : IAiService
         return $"{(char)('A' + row)}{col + 1}";
     }
 
-    private (int Row, int Col)? GetBestHeatmapMove(InternalGame game, bool useParity)
-    {
-        int gridSize = game.PlayerGrid.Length;
-        int[][] heatmap = new int[gridSize][];
-        for (int i = 0; i < gridSize; i++) heatmap[i] = new int[gridSize];
-
-        // Calculate probability for each remaining ship
-        foreach (var shipSize in game.AlivePlayerShips)
-        {
-            for (int r = 0; r < gridSize; r++)
-            {
-                for (int c = 0; c < gridSize; c++)
-                {
-                    // Check Horizontal
-                    if (CanPlaceShip(game.PlayerGrid, r, c, shipSize, true))
-                    {
-                        for (int k = 0; k < shipSize; k++) heatmap[r][c + k]++;
-                    }
-                    // Check Vertical
-                    if (CanPlaceShip(game.PlayerGrid, r, c, shipSize, false))
-                    {
-                        for (int k = 0; k < shipSize; k++) heatmap[r + k][c]++;
-                    }
-                }
-            }
-        }
-
-        // Apply Parity Mask if requested and smallest ship > 1
-        // If smallest ship is 1, parity doesn't help (we must check every cell)
-        if (useParity && game.AlivePlayerShips.Count > 0 && game.AlivePlayerShips.Min() > 1)
-        {
-            for (int r = 0; r < gridSize; r++)
-            {
-                for (int c = 0; c < gridSize; c++)
-                {
-                    if ((r + c) % 2 != 0)
-                    {
-                        heatmap[r][c] = 0; // Zero out odd cells
-                    }
-                }
-            }
-        }
-
-        // Find cell with max score that hasn't been hit
-        int maxScore = -1;
-        var bestMoves = new List<(int, int)>();
-
-        for (int r = 0; r < gridSize; r++)
-        {
-            for (int c = 0; c < gridSize; c++)
-            {
-                if (IsValidAttack(game.PlayerGrid, r, c))
-                {
-                    if (heatmap[r][c] > maxScore)
-                    {
-                        maxScore = heatmap[r][c];
-                        bestMoves.Clear();
-                        bestMoves.Add((r, c));
-                    }
-                    else if (heatmap[r][c] == maxScore)
-                    {
-                        bestMoves.Add((r, c));
-                    }
-                }
-            }
-        }
-
-        if (bestMoves.Count > 0)
-        {
-            // Pick random from best moves to avoid predictability
-            var choice = bestMoves[Random.Shared.Next(bestMoves.Count)];
-            return (choice.Item1, choice.Item2);
-        }
-
-        return null;
-    }
-
-    private bool CanPlaceShip(char[][] grid, int r, int c, int size, bool horizontal)
-    {
-        int gridSize = grid.Length;
-        if (horizontal)
-        {
-            if (c + size > gridSize) return false;
-            for (int k = 0; k < size; k++)
-            {
-                char cell = grid[r][c + k];
-                // 'X' and 'O' are blockers. We assume we are looking for NEW ships.
-                // If we hit a ship ('X'), we can't place another ship ON TOP of it.
-                if (cell == 'X' || cell == 'O') return false;
-            }
-        }
-        else
-        {
-            if (r + size > gridSize) return false;
-            for (int k = 0; k < size; k++)
-            {
-                char cell = grid[r + k][c];
-                if (cell == 'X' || cell == 'O') return false;
-            }
-        }
-        return true;
-    }
+    // Removed GetBestHeatmapMove as it is now in AiStrategyHelper
 }
+

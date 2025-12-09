@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using BattleShip.App.Constants;
 using BattleShip.Models;
 using BattleShip.Protos;
 
@@ -35,13 +36,13 @@ public class GameClient
             {
                 var request = new GrpcCreateGameRequest { Difficulty = (int)difficulty, GridSize = gridSize };
                 var grpcGame = await _grpcClient.CreateGameAsync(request);
-                CurrentGame = MapFromGrpc(grpcGame);
+                CurrentGame = GrpcMapper.MapFromGrpc(grpcGame);
                 Message = $"Game Started (via gRPC, {difficulty})! Good luck.";
             }
             else
             {
                 var request = new CreateGameRequest { Difficulty = difficulty, GridSize = gridSize };
-                var response = await _httpClient.PostAsJsonAsync("/game", request);
+                var response = await _httpClient.PostAsJsonAsync(ApiConstants.BaseUrl, request);
                 if (response.IsSuccessStatusCode)
                 {
                     CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
@@ -57,72 +58,6 @@ public class GameClient
         {
             Message = $"Error: {ex.Message}";
         }
-    }
-
-    private GameStatus MapFromGrpc(GrpcGameStatus grpcGame)
-    {
-        var game = new GameStatus
-        {
-            GameId = grpcGame.GameId,
-            Winner = string.IsNullOrEmpty(grpcGame.Winner) ? null : grpcGame.Winner,
-            IsGameOver = grpcGame.IsGameOver,
-            LastAttackResult = string.IsNullOrEmpty(grpcGame.LastAttackResult) ? null : grpcGame.LastAttackResult,
-            LastAiAttackResult = string.IsNullOrEmpty(grpcGame.LastAiAttackResult) ? null : grpcGame.LastAiAttackResult,
-            State = (GameState)grpcGame.State,
-            History = new List<MoveHistory>()
-        };
-
-        // Map Player Grid
-        game.PlayerGrid = new char[grpcGame.PlayerGrid.Count][];
-        for (int i = 0; i < grpcGame.PlayerGrid.Count; i++)
-        {
-            game.PlayerGrid[i] = grpcGame.PlayerGrid[i].ToCharArray();
-        }
-
-        // Map Opponent Grid
-        game.OpponentGrid = new bool?[grpcGame.OpponentGrid.Count][];
-        for (int i = 0; i < grpcGame.OpponentGrid.Count; i++)
-        {
-            var row = grpcGame.OpponentGrid[i];
-            game.OpponentGrid[i] = new bool?[row.Values.Count];
-            for (int j = 0; j < row.Values.Count; j++)
-            {
-                // 0 = null, 1 = hit (true), 2 = miss (false)
-                int val = row.Values[j];
-                if (val == 0) game.OpponentGrid[i][j] = null;
-                else if (val == 1) game.OpponentGrid[i][j] = true;
-                else if (val == 2) game.OpponentGrid[i][j] = false;
-            }
-        }
-
-        // Map History
-        foreach (var h in grpcGame.History)
-        {
-            game.History.Add(new MoveHistory
-            {
-                Turn = h.Turn,
-                PlayerMove = h.PlayerMove,
-                PlayerResult = h.PlayerResult,
-                AiMove = h.AiMove,
-                AiResult = h.AiResult
-            });
-        }
-
-        // Map Ships
-        game.Ships = new List<ShipInfo>();
-        foreach (var s in grpcGame.Ships)
-        {
-            game.Ships.Add(new ShipInfo
-            {
-                Letter = s.Letter[0],
-                Size = s.Size,
-                Row = s.Row,
-                Col = s.Col,
-                IsHorizontal = s.IsHorizontal
-            });
-        }
-
-        return game;
     }
 
     public async Task PlaceShipsAsync(List<ShipInfo> ships)
@@ -151,14 +86,14 @@ public class GameClient
                 }
 
                 var grpcGame = await _grpcClient.PlaceShipsAsync(grpcRequest);
-                CurrentGame = MapFromGrpc(grpcGame);
+                CurrentGame = GrpcMapper.MapFromGrpc(grpcGame);
                 Message = "Ships placed! Battle starts (gRPC).";
             }
             else
             {
                 if (CurrentGame.GameId == null) return;
                 var request = new PlaceShipsRequest { GameId = Guid.Parse(CurrentGame.GameId), Ships = ships };
-                var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/place-ships", request);
+                var response = await _httpClient.PostAsJsonAsync($"{ApiConstants.BaseUrl}/{CurrentGame.GameId}{ApiConstants.PlaceShipsEndpoint}", request);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -192,12 +127,12 @@ public class GameClient
                     Col = col 
                 };
                 var grpcGame = await _grpcClient.AttackAsync(request);
-                CurrentGame = MapFromGrpc(grpcGame);
+                CurrentGame = GrpcMapper.MapFromGrpc(grpcGame);
             }
             else
             {
                 var request = new AttackRequest { Row = row, Col = col };
-                var response = await _httpClient.PostAsJsonAsync($"/game/{CurrentGame.GameId}/attack", request);
+                var response = await _httpClient.PostAsJsonAsync($"{ApiConstants.BaseUrl}/{CurrentGame.GameId}{ApiConstants.AttackEndpoint}", request);
                 
                 if (response.IsSuccessStatusCode)
                 {
@@ -243,11 +178,11 @@ public class GameClient
             {
                 var request = new GrpcUndoRequest { GameId = CurrentGame.GameId ?? string.Empty };
                 var grpcGame = await _grpcClient.UndoAsync(request);
-                CurrentGame = MapFromGrpc(grpcGame);
+                CurrentGame = GrpcMapper.MapFromGrpc(grpcGame);
             }
             else
             {
-                var response = await _httpClient.PostAsync($"/game/{CurrentGame.GameId}/undo", null);
+                var response = await _httpClient.PostAsync($"{ApiConstants.BaseUrl}/{CurrentGame.GameId}{ApiConstants.UndoEndpoint}", null);
                 if (response.IsSuccessStatusCode)
                 {
                     CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
@@ -276,11 +211,11 @@ public class GameClient
             {
                 var request = new GrpcUndoToTurnRequest { GameId = CurrentGame.GameId ?? string.Empty, Turn = turn };
                 var grpcGame = await _grpcClient.UndoToTurnAsync(request);
-                CurrentGame = MapFromGrpc(grpcGame);
+                CurrentGame = GrpcMapper.MapFromGrpc(grpcGame);
             }
             else
             {
-                var response = await _httpClient.PostAsync($"/game/{CurrentGame.GameId}/undo-to-turn/{turn}", null);
+                var response = await _httpClient.PostAsync($"{ApiConstants.BaseUrl}/{CurrentGame.GameId}{ApiConstants.UndoToTurnEndpoint}/{turn}", null);
                 if (response.IsSuccessStatusCode)
                 {
                     CurrentGame = await response.Content.ReadFromJsonAsync<GameStatus>();
@@ -298,3 +233,4 @@ public class GameClient
         }
     }
 }
+
